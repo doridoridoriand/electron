@@ -1,7 +1,9 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
+from __future__ import print_function
 import argparse
 import glob
 import os
+import platform
 import shutil
 import subprocess
 import sys
@@ -24,21 +26,24 @@ def main():
   try:
     with scoped_cwd(app_path):
       if args.snapshot_files_dir is None:
-        mkargs = [ get_binary_path('mksnapshot', app_path), \
-                    SNAPSHOT_SOURCE, '--startup_blob', 'snapshot_blob.bin', \
-                    '--turbo_instruction_scheduling',
-                    '--no-native-code-counters' ]
-        subprocess.check_call(mkargs)
-        print 'ok mksnapshot successfully created snapshot_blob.bin.'
+        with open(os.path.join(app_path, 'mksnapshot_args')) as f:
+          mkargs = f.read().splitlines()
+        subprocess.check_call(mkargs + [ SNAPSHOT_SOURCE ], cwd=app_path)
+        print('ok mksnapshot successfully created snapshot_blob.bin.')
         context_snapshot = 'v8_context_snapshot.bin'
+        if platform.system() == 'Darwin':
+          if os.environ.get('TARGET_ARCH') == 'arm64':
+            context_snapshot = 'v8_context_snapshot.arm64.bin'
+          else:
+            context_snapshot = 'v8_context_snapshot.x86_64.bin'
         context_snapshot_path = os.path.join(app_path, context_snapshot)
         gen_binary = get_binary_path('v8_context_snapshot_generator', \
                                     app_path)
         genargs = [ gen_binary, \
                   '--output_file={0}'.format(context_snapshot_path) ]
         subprocess.check_call(genargs)
-        print 'ok v8_context_snapshot_generator successfully created ' \
-              + context_snapshot
+        print('ok v8_context_snapshot_generator successfully created ' \
+              + context_snapshot)
         if args.create_snapshot_only:
           return 0
       else:
@@ -65,21 +70,21 @@ def main():
         electron = os.path.join(app_path, PROJECT_NAME)
 
       subprocess.check_call([electron, test_path])
-      print 'ok successfully used custom snapshot.'
+      print('ok successfully used custom snapshot.')
   except subprocess.CalledProcessError as e:
-    print 'not ok an error was encountered while testing mksnapshot.'
-    print e
+    print('not ok an error was encountered while testing mksnapshot.')
+    print(e)
     returncode = e.returncode
   except KeyboardInterrupt:
-    print 'Other error'
+    print('Other error')
     returncode = 0
-  print 'Returning with error code: {0}'.format(returncode)
+  print('Returning with error code: {0}'.format(returncode))
   return returncode
 
 
 # Create copy of app to install custom snapshot
 def create_app_copy(initial_app_path):
-  print 'Creating copy of app for testing'
+  print('Creating copy of app for testing')
   app_path = os.path.join(os.path.dirname(initial_app_path),
                           os.path.basename(initial_app_path)
                           + '-mksnapshot-test')

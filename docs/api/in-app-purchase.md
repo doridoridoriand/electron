@@ -21,39 +21,18 @@ Returns:
 
 The `inAppPurchase` module has the following methods:
 
-### `inAppPurchase.purchaseProduct(productID, quantity, callback)`
+### `inAppPurchase.purchaseProduct(productID[, quantity])`
 
-* `productID` String - The identifiers of the product to purchase. (The identifier of `com.example.app.product1` is `product1`).
-* `quantity` Integer (optional) - The number of items the user wants to purchase.
-* `callback` Function (optional) - The callback called when the payment is added to the PaymentQueue.
-  * `isProductValid` Boolean - Determine if the product is valid and added to the payment queue.
-
-You should listen for the `transactions-updated` event as soon as possible and certainly before you call `purchaseProduct`.
-
-**[Deprecated Soon](modernization/promisification.md)**
-
-### `inAppPurchase.purchaseProduct(productID, quantity)`
-
-* `productID` String - The identifiers of the product to purchase. (The identifier of `com.example.app.product1` is `product1`).
+* `productID` string - The identifiers of the product to purchase. (The identifier of `com.example.app.product1` is `product1`).
 * `quantity` Integer (optional) - The number of items the user wants to purchase.
 
-Returns `Promise<Boolean>` - Returns `true` if the product is valid and added to the payment queue.
+Returns `Promise<boolean>` - Returns `true` if the product is valid and added to the payment queue.
 
 You should listen for the `transactions-updated` event as soon as possible and certainly before you call `purchaseProduct`.
-
-### `inAppPurchase.getProducts(productIDs, callback)`
-
-* `productIDs` String[] - The identifiers of the products to get.
-* `callback` Function - The callback called with the products or an empty array if the products don't exist.
-  * `products` Product[] - Array of [`Product`](structures/product.md) objects
-
-Retrieves the product descriptions.
-
-**[Deprecated Soon](modernization/promisification.md)**
 
 ### `inAppPurchase.getProducts(productIDs)`
 
-* `productIDs` String[] - The identifiers of the products to get.
+* `productIDs` string[] - The identifiers of the products to get.
 
 Returns `Promise<Product[]>` - Resolves with an array of [`Product`](structures/product.md) objects.
 
@@ -61,11 +40,17 @@ Retrieves the product descriptions.
 
 ### `inAppPurchase.canMakePayments()`
 
-Returns `Boolean`, whether a user can make a payment.
+Returns `boolean` - whether a user can make a payment.
+
+### `inAppPurchase.restoreCompletedTransactions()`
+
+Restores finished transactions. This method can be called either to install purchases on additional devices, or to restore purchases for an application that the user deleted and reinstalled.
+
+[The payment queue](https://developer.apple.com/documentation/storekit/skpaymentqueue?language=objc) delivers a new transaction for each previously completed transaction that can be restored. Each transaction includes a copy of the original transaction.
 
 ### `inAppPurchase.getReceiptURL()`
 
-Returns `String`, the path to the receipt.
+Returns `string` - the path to the receipt.
 
 ### `inAppPurchase.finishAllTransactions()`
 
@@ -73,6 +58,6 @@ Completes all pending transactions.
 
 ### `inAppPurchase.finishTransactionByDate(date)`
 
-* `date` String - The ISO formatted date of the transaction to finish.
+* `date` string - The ISO formatted date of the transaction to finish.
 
 Completes the pending transactions corresponding to the date.

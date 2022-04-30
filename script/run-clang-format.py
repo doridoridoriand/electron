@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 """A wrapper script around clang-format, suitable for linting multiple files
 and to use for continuous integration.
 This is an alternative API for the clang-format command line.
@@ -15,6 +15,7 @@ import fnmatch
 import io
 import multiprocessing
 import os
+import posixpath
 import signal
 import subprocess
 import sys
@@ -22,6 +23,7 @@ import traceback
 import tempfile
 
 from functools import partial
+from lib.util import get_buildtools_executable
 
 DEFAULT_EXTENSIONS = 'c,h,C,H,cpp,hpp,cc,hh,c++,h++,cxx,hxx,mm'
 
@@ -76,12 +78,14 @@ def make_diff(diff_file, original, reformatted):
 
 class DiffError(Exception):
     def __init__(self, message, errs=None):
+        # pylint: disable=R1725
         super(DiffError, self).__init__(message)
         self.errs = errs or []
 
 
 class UnexpectedError(Exception):
     def __init__(self, message, exc=None):
+        # pylint: disable=R1725
         super(UnexpectedError, self).__init__(message)
         self.formatted_traceback = traceback.format_exc()
         self.exc = exc
@@ -94,6 +98,7 @@ def run_clang_format_diff_wrapper(args, file_name):
     except DiffError:
         raise
     except Exception as e:
+        # pylint: disable=W0707
         raise UnexpectedError('{}: {}: {}'.format(
             file_name, e.__class__.__name__, e), e)
 
@@ -103,6 +108,7 @@ def run_clang_format_diff(args, file_name):
         with io.open(file_name, 'r', encoding='utf-8') as f:
             original = f.readlines()
     except IOError as exc:
+        # pylint: disable=W0707
         raise DiffError(str(exc))
     invocation = [args.clang_format_executable, file_name]
     if args.fix:
@@ -115,16 +121,18 @@ def run_clang_format_diff(args, file_name):
             universal_newlines=True,
             shell=True)
     except OSError as exc:
+        # pylint: disable=W0707
         raise DiffError(str(exc))
     proc_stdout = proc.stdout
     proc_stderr = proc.stderr
-    if sys.version_info[0] < 3:
-        # make the pipes compatible with Python 3,
-        # reading lines should output unicode
-        encoding = 'utf-8'
-        proc_stdout = codecs.getreader(encoding)(proc_stdout)
-        proc_stderr = codecs.getreader(encoding)(proc_stderr)
-    # hopefully the stderr pipe won't get full and block the process
+    if sys.version_info[0] == 3:
+        proc_stdout = proc_stdout.detach()
+        proc_stderr = proc_stderr.detach()
+    # make the pipes compatible with Python 3,
+    # reading lines should output unicode
+    encoding = 'utf-8'
+    proc_stdout = codecs.getreader(encoding)(proc_stdout)
+    proc_stderr = codecs.getreader(encoding)(proc_stderr)
     outs = list(proc_stdout.readlines())
     errs = list(proc_stderr.readlines())
     proc.wait()
@@ -133,6 +141,8 @@ def run_clang_format_diff(args, file_name):
             proc.returncode, file_name), errs)
     if args.fix:
         return None, errs
+    if sys.platform == 'win32':
+        file_name = file_name.replace(os.sep, posixpath.sep)
     return make_diff(file_name, original, outs), errs
 
 
@@ -188,7 +198,7 @@ def main():
         '--clang-format-executable',
         metavar='EXECUTABLE',
         help='path to the clang-format executable',
-        default='clang-format')
+        default=get_buildtools_executable('clang-format'))
     parser.add_argument(
         '--extensions',
         help='comma separated list of file extensions (default: {})'.format(
@@ -282,7 +292,7 @@ def main():
         extensions=args.extensions.split(','))
 
     if not files:
-        return
+        return 0
 
     njobs = args.j
     if njobs == 0:
@@ -329,8 +339,8 @@ def main():
                 if not args.quiet:
                     print_diff(outs, use_color=colored_stdout)
                     for line in outs:
-                        patch_file.write(line)
-                    patch_file.write('\n')
+                        patch_file.write(line.encode('utf-8'))
+                    patch_file.write('\n'.encode('utf-8'))
                 if retcode == ExitStatus.SUCCESS:
                     retcode = ExitStatus.DIFF
 

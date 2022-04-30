@@ -18,7 +18,7 @@ The `systemPreferences` object emits the following events:
 Returns:
 
 * `event` Event
-* `newColor` String - The new RGBA color the user assigned to be their system
+* `newColor` string - The new RGBA color the user assigned to be their system
   accent color.
 
 ### Event: 'color-changed' _Windows_
@@ -27,76 +27,76 @@ Returns:
 
 * `event` Event
 
-### Event: 'inverted-color-scheme-changed' _Windows_
+### Event: 'inverted-color-scheme-changed' _Windows_ _Deprecated_
 
 Returns:
 
 * `event` Event
-* `invertedColorScheme` Boolean - `true` if an inverted color scheme (a high contrast color scheme with light text and dark backgrounds) is being used, `false` otherwise.
+* `invertedColorScheme` boolean - `true` if an inverted color scheme (a high contrast color scheme with light text and dark backgrounds) is being used, `false` otherwise.
 
-### Event: 'high-contrast-color-scheme-changed' _Windows_
+**Deprecated:** Should use the new [`updated`](native-theme.md#event-updated) event on the `nativeTheme` module.
+
+### Event: 'high-contrast-color-scheme-changed' _Windows_ _Deprecated_
 
 Returns:
 
 * `event` Event
-* `highContrastColorScheme` Boolean - `true` if a high contrast theme is being used, `false` otherwise.
+* `highContrastColorScheme` boolean - `true` if a high contrast theme is being used, `false` otherwise.
 
-### Event: 'appearance-changed' _macOS_
-
-Returns:
-
-* `newAppearance` String - Can be `dark` or `light`
-
-**NOTE:** This event is only emitted after you have called `startAppLevelAppearanceTrackingOS`
+**Deprecated:** Should use the new [`updated`](native-theme.md#event-updated) event on the `nativeTheme` module.
 
 ## Methods
 
-### `systemPreferences.isDarkMode()` _macOS_
+### `systemPreferences.isDarkMode()` _macOS_ _Windows_ _Deprecated_
 
-Returns `Boolean` - Whether the system is in Dark Mode.
+Returns `boolean` - Whether the system is in Dark Mode.
+
+**Deprecated:** Should use the new [`nativeTheme.shouldUseDarkColors`](native-theme.md#nativethemeshouldusedarkcolors-readonly) API.
 
 ### `systemPreferences.isSwipeTrackingFromScrollEventsEnabled()` _macOS_
 
-Returns `Boolean` - Whether the Swipe between pages setting is on.
+Returns `boolean` - Whether the Swipe between pages setting is on.
 
 ### `systemPreferences.postNotification(event, userInfo[, deliverImmediately])` _macOS_
 
-* `event` String
-* `userInfo` Object
-* `deliverImmediately` Boolean (optional) - `true` to post notifications immediately even when the subscribing app is inactive.
+* `event` string
+* `userInfo` Record<string, any>
+* `deliverImmediately` boolean (optional) - `true` to post notifications immediately even when the subscribing app is inactive.
 
 Posts `event` as native notifications of macOS. The `userInfo` is an Object
 that contains the user information dictionary sent along with the notification.
 
 ### `systemPreferences.postLocalNotification(event, userInfo)` _macOS_
 
-* `event` String
-* `userInfo` Object
+* `event` string
+* `userInfo` Record<string, any>
 
 Posts `event` as native notifications of macOS. The `userInfo` is an Object
 that contains the user information dictionary sent along with the notification.
 
 ### `systemPreferences.postWorkspaceNotification(event, userInfo)` _macOS_
 
-* `event` String
-* `userInfo` Object
+* `event` string
+* `userInfo` Record<string, any>
 
 Posts `event` as native notifications of macOS. The `userInfo` is an Object
 that contains the user information dictionary sent along with the notification.
 
 ### `systemPreferences.subscribeNotification(event, callback)` _macOS_
 
-* `event` String
+* `event` string | null
 * `callback` Function
-  * `event` String
-  * `userInfo` Object
+  * `event` string
+  * `userInfo` Record<string, unknown>
+  * `object` string
 
-Returns `Number` - The ID of this subscription
+Returns `number` - The ID of this subscription
 
 Subscribes to native notifications of macOS, `callback` will be called with
 `callback(event, userInfo)` when the corresponding `event` happens. The
 `userInfo` is an Object that contains the user information dictionary sent
-along with the notification.
+along with the notification. The `object` is the sender of the notification,
+and only supports `NSString` values for now.
 
 The `id` of the subscriber is returned, which can be used to unsubscribe the
 `event`.
@@ -109,27 +109,37 @@ example values of `event` are:
 * `AppleColorPreferencesChangedNotification`
 * `AppleShowScrollBarsSettingChanged`
 
+If `event` is null, the `NSDistributedNotificationCenter` doesn’t use it as criteria for delivery to the observer. See [docs](https://developer.apple.com/documentation/foundation/nsnotificationcenter/1411723-addobserverforname?language=objc)  for more information.
+
 ### `systemPreferences.subscribeLocalNotification(event, callback)` _macOS_
 
-* `event` String
+* `event` string | null
 * `callback` Function
-  * `event` String
-  * `userInfo` Object
+  * `event` string
+  * `userInfo` Record<string, unknown>
+  * `object` string
 
-Returns `Number` - The ID of this subscription
+Returns `number` - The ID of this subscription
 
 Same as `subscribeNotification`, but uses `NSNotificationCenter` for local defaults.
 This is necessary for events such as `NSUserDefaultsDidChangeNotification`.
 
+If `event` is null, the `NSNotificationCenter` doesn’t use it as criteria for delivery to the observer. See [docs](https://developer.apple.com/documentation/foundation/nsnotificationcenter/1411723-addobserverforname?language=objc) for more information.
+
 ### `systemPreferences.subscribeWorkspaceNotification(event, callback)` _macOS_
 
-* `event` String
+* `event` string | null
 * `callback` Function
-  * `event` String
-  * `userInfo` Object
+  * `event` string
+  * `userInfo` Record<string, unknown>
+  * `object` string
+
+Returns `number` - The ID of this subscription
 
 Same as `subscribeNotification`, but uses `NSWorkspace.sharedWorkspace.notificationCenter`.
 This is necessary for events such as `NSWorkspaceDidActivateApplicationNotification`.
+
+If `event` is null, the `NSWorkspaceNotificationCenter` doesn’t use it as criteria for delivery to the observer. See [docs](https://developer.apple.com/documentation/foundation/nsnotificationcenter/1411723-addobserverforname?language=objc) for more information.
 
 ### `systemPreferences.unsubscribeNotification(id)` _macOS_
 
@@ -151,17 +161,17 @@ Same as `unsubscribeNotification`, but removes the subscriber from `NSWorkspace.
 
 ### `systemPreferences.registerDefaults(defaults)` _macOS_
 
-* `defaults` Object - a dictionary of (`key: value`) user defaults
+* `defaults` Record<string, string | boolean | number> - a dictionary of (`key: value`) user defaults
 
 Add the specified defaults to your application's `NSUserDefaults`.
 
-### `systemPreferences.getUserDefault(key, type)` _macOS_
+### `systemPreferences.getUserDefault<Type extends keyof UserDefaultTypes>(key, type)` _macOS_
 
-* `key` String
-* `type` String - Can be `string`, `boolean`, `integer`, `float`, `double`,
+* `key` string
+* `type` Type - Can be `string`, `boolean`, `integer`, `float`, `double`,
   `url`, `array` or `dictionary`.
 
-Returns `any` - The value of `key` in `NSUserDefaults`.
+Returns [`UserDefaultTypes[Type]`](structures/user-default-types.md) - The value of `key` in `NSUserDefaults`.
 
 Some popular `key` and `type`s are:
 
@@ -173,11 +183,11 @@ Some popular `key` and `type`s are:
 * `NSPreferredWebServices`: `dictionary`
 * `NSUserDictionaryReplacementItems`: `array`
 
-### `systemPreferences.setUserDefault(key, type, value)` _macOS_
+### `systemPreferences.setUserDefault<Type extends keyof UserDefaultTypes>(key, type, value)` _macOS_
 
-* `key` String
-* `type` String - See [`getUserDefault`](#systempreferencesgetuserdefaultkey-type-macos).
-* `value` String
+* `key` string
+* `type` Type - Can be `string`, `boolean`, `integer`, `float`, `double`, `url`, `array` or `dictionary`.
+* `value` UserDefaultTypes[Type]
 
 Set the value of `key` in `NSUserDefaults`.
 
@@ -190,14 +200,14 @@ Some popular `key` and `type`s are:
 
 ### `systemPreferences.removeUserDefault(key)` _macOS_
 
-* `key` String
+* `key` string
 
 Removes the `key` in `NSUserDefaults`. This can be used to restore the default
 or global value of a `key` previously set with `setUserDefault`.
 
 ### `systemPreferences.isAeroGlassEnabled()` _Windows_
 
-Returns `Boolean` - `true` if [DWM composition][dwm-composition] (Aero Glass) is
+Returns `boolean` - `true` if [DWM composition][dwm-composition] (Aero Glass) is
 enabled, and `false` otherwise.
 
 An example of using it to determine if you should create a transparent window or
@@ -205,7 +215,7 @@ not (transparent windows won't work correctly when DWM composition is disabled):
 
 ```javascript
 const { BrowserWindow, systemPreferences } = require('electron')
-let browserOptions = { width: 1000, height: 800 }
+const browserOptions = { width: 1000, height: 800 }
 
 // Make the window transparent only if the platform supports it.
 if (process.platform !== 'win32' || systemPreferences.isAeroGlassEnabled()) {
@@ -214,7 +224,7 @@ if (process.platform !== 'win32' || systemPreferences.isAeroGlassEnabled()) {
 }
 
 // Create the window.
-let win = new BrowserWindow(browserOptions)
+const win = new BrowserWindow(browserOptions)
 
 // Navigate.
 if (browserOptions.transparent) {
@@ -229,7 +239,7 @@ if (browserOptions.transparent) {
 
 ### `systemPreferences.getAccentColor()` _Windows_ _macOS_
 
-Returns `String` - The users current system wide accent color preference in RGBA
+Returns `string` - The users current system wide accent color preference in RGBA
 hexadecimal form.
 
 ```js
@@ -244,7 +254,7 @@ This API is only available on macOS 10.14 Mojave or newer.
 
 ### `systemPreferences.getColor(color)` _Windows_ _macOS_
 
-* `color` String - One of the following values:
+* `color` string - One of the following values:
   * On **Windows**:
     * `3d-dark-shadow` - Dark shadow for three-dimensional display elements.
     * `3d-face` - Face color for three-dimensional display elements and for dialog
@@ -287,7 +297,7 @@ This API is only available on macOS 10.14 Mojave or newer.
     * `window-frame` - Window frame.
     * `window-text` - Text in windows.
   * On **macOS**
-    * `alternate-selected-control-text` - The text on a selected surface in a list or table.
+    * `alternate-selected-control-text` - The text on a selected surface in a list or table. _deprecated_
     * `control-background` - The background of a large interface element, such as a browser or table.
     * `control` - The surface of a control.
     * `control-text` -The text of a control that isn’t disabled.
@@ -306,7 +316,7 @@ This API is only available on macOS 10.14 Mojave or newer.
     * `selected-content-background` - The background for selected content in a key window or view.
     * `selected-control` - The surface of a selected control.
     * `selected-control-text` - The text of a selected control.
-    * `selected-menu-item` - The text of a selected menu.
+    * `selected-menu-item-text` - The text of a selected menu.
     * `selected-text-background` - The background of selected text.
     * `selected-text` - Selected text.
     * `separator` - A separator between different sections of content.
@@ -321,15 +331,17 @@ This API is only available on macOS 10.14 Mojave or newer.
     * `window-background` - The background of a window.
     * `window-frame-text` - The text in the window's titlebar area.
 
-Returns `String` - The system color setting in RGB hexadecimal form (`#ABCDEF`).
-See the [Windows docs][windows-colors] and the [MacOS docs][macos-colors] for more details.
+Returns `string` - The system color setting in RGB hexadecimal form (`#ABCDEF`).
+See the [Windows docs][windows-colors] and the [macOS docs][macos-colors] for more details.
+
+The following colors are only available on macOS 10.14: `find-highlight`, `selected-content-background`, `separator`, `unemphasized-selected-content-background`, `unemphasized-selected-text-background`, and `unemphasized-selected-text`.
 
 [windows-colors]:https://msdn.microsoft.com/en-us/library/windows/desktop/ms724371(v=vs.85).aspx
 [macos-colors]:https://developer.apple.com/design/human-interface-guidelines/macos/visual-design/color#dynamic-system-colors
 
 ### `systemPreferences.getSystemColor(color)` _macOS_
 
-* `color` String - One of the following values:
+* `color` string - One of the following values:
   * `blue`
   * `brown`
   * `gray`
@@ -340,55 +352,53 @@ See the [Windows docs][windows-colors] and the [MacOS docs][macos-colors] for mo
   * `red`
   * `yellow`
 
+Returns `string` - The standard system color formatted as `#RRGGBBAA`.
+
 Returns one of several standard system colors that automatically adapt to vibrancy and changes in accessibility settings like 'Increase contrast' and 'Reduce transparency'. See [Apple Documentation](https://developer.apple.com/design/human-interface-guidelines/macos/visual-design/color#system-colors) for  more details.
 
-### `systemPreferences.isInvertedColorScheme()` _Windows_
+### `systemPreferences.isInvertedColorScheme()` _Windows_ _Deprecated_
 
-Returns `Boolean` - `true` if an inverted color scheme (a high contrast color scheme with light text and dark backgrounds) is active, `false` otherwise.
+Returns `boolean` - `true` if an inverted color scheme (a high contrast color scheme with light text and dark backgrounds) is active, `false` otherwise.
 
-### `systemPreferences.isHighContrastColorScheme()` _Windows_
+**Deprecated:** Should use the new [`nativeTheme.shouldUseInvertedColorScheme`](native-theme.md#nativethemeshoulduseinvertedcolorscheme-macos-windows-readonly) API.
 
-Returns `Boolean` - `true` if a high contrast theme is active, `false` otherwise.
+### `systemPreferences.isHighContrastColorScheme()` _macOS_ _Windows_ _Deprecated_
+
+Returns `boolean` - `true` if a high contrast theme is active, `false` otherwise.
+
+**Deprecated:** Should use the new [`nativeTheme.shouldUseHighContrastColors`](native-theme.md#nativethemeshouldusehighcontrastcolors-macos-windows-readonly) API.
 
 ### `systemPreferences.getEffectiveAppearance()` _macOS_
 
-Returns `String` - Can be `dark`, `light` or `unknown`.
+Returns `string` - Can be `dark`, `light` or `unknown`.
 
 Gets the macOS appearance setting that is currently applied to your application,
 maps to [NSApplication.effectiveAppearance](https://developer.apple.com/documentation/appkit/nsapplication/2967171-effectiveappearance?language=objc)
 
-Please note that until Electron is built targeting the 10.14 SDK, your application's
-`effectiveAppearance` will default to 'light' and won't inherit the OS preference. In
-the interim in order for your application to inherit the OS preference you must set the
-`NSRequiresAquaSystemAppearance` key in your apps `Info.plist` to `false`.  If you are
-using `electron-packager` or `electron-forge` just set the `enableDarwinDarkMode`
-packager option to `true`.  See the [Electron Packager API](https://github.com/electron-userland/electron-packager/blob/master/docs/api.md#darwindarkmodesupport)
-for more details.
+### `systemPreferences.getAppLevelAppearance()` _macOS_ _Deprecated_
 
-### `systemPreferences.getAppLevelAppearance()` _macOS_
-
-Returns `String` | `null` - Can be `dark`, `light` or `unknown`.
+Returns `string` | `null` - Can be `dark`, `light` or `unknown`.
 
 Gets the macOS appearance setting that you have declared you want for
 your application, maps to [NSApplication.appearance](https://developer.apple.com/documentation/appkit/nsapplication/2967170-appearance?language=objc).
 You can use the `setAppLevelAppearance` API to set this value.
 
-### `systemPreferences.setAppLevelAppearance(appearance)` _macOS_
+### `systemPreferences.setAppLevelAppearance(appearance)` _macOS_ _Deprecated_
 
-* `appearance` String | null - Can be `dark` or `light`
+* `appearance` string | null - Can be `dark` or `light`
 
 Sets the appearance setting for your application, this should override the
 system default and override the value of `getEffectiveAppearance`.
 
 ### `systemPreferences.canPromptTouchID()` _macOS_
 
-Returns `Boolean` - whether or not this device has the ability to use Touch ID.
+Returns `boolean` - whether or not this device has the ability to use Touch ID.
 
 **NOTE:** This API will return `false` on macOS systems older than Sierra 10.12.2.
 
 ### `systemPreferences.promptTouchID(reason)` _macOS_
 
-* `reason` String - The reason you are asking for Touch ID authentication
+* `reason` string - The reason you are asking for Touch ID authentication
 
 Returns `Promise<void>` - resolves if the user has successfully authenticated with Touch ID.
 
@@ -402,31 +412,36 @@ systemPreferences.promptTouchID('To get consent for a Security-Gated Thing').the
 })
 ```
 
-This API itself will not protect your user data; rather, it is a mechanism to allow you to do so. Native apps will need to set [Access Control Constants](https://developer.apple.com/documentation/security/secaccesscontrolcreateflags?language=objc) like [`kSecAccessControlUserPresence`](https://developer.apple.com/documentation/security/secaccesscontrolcreateflags/ksecaccesscontroluserpresence?language=objc) on the their keychain entry so that reading it would auto-prompt for Touch ID biometric consent. This could be done with [`node-keytar`](https://github.com/atom/node-keytar), such that one would store an encryption key with `node-keytar` and only fetch it if `promptTouchID()` resolves.
+This API itself will not protect your user data; rather, it is a mechanism to allow you to do so. Native apps will need to set [Access Control Constants](https://developer.apple.com/documentation/security/secaccesscontrolcreateflags?language=objc) like [`kSecAccessControlUserPresence`](https://developer.apple.com/documentation/security/secaccesscontrolcreateflags/ksecaccesscontroluserpresence?language=objc) on their keychain entry so that reading it would auto-prompt for Touch ID biometric consent. This could be done with [`node-keytar`](https://github.com/atom/node-keytar), such that one would store an encryption key with `node-keytar` and only fetch it if `promptTouchID()` resolves.
 
 **NOTE:** This API will return a rejected Promise on macOS systems older than Sierra 10.12.2.
 
 ### `systemPreferences.isTrustedAccessibilityClient(prompt)` _macOS_
 
-* `prompt` Boolean - whether or not the user will be informed via prompt if the current process is untrusted.
+* `prompt` boolean - whether or not the user will be informed via prompt if the current process is untrusted.
 
-Returns `Boolean` - `true` if the current process is a trusted accessibility client and `false` if it is not.
+Returns `boolean` - `true` if the current process is a trusted accessibility client and `false` if it is not.
 
-### `systemPreferences.getMediaAccessStatus(mediaType)` _macOS_
+### `systemPreferences.getMediaAccessStatus(mediaType)` _Windows_ _macOS_
 
-* `mediaType` String - `microphone` or `camera`.
+* `mediaType` string - Can be `microphone`, `camera` or `screen`.
 
-Returns `String` - Can be `not-determined`, `granted`, `denied`, `restricted` or `unknown`.
+Returns `string` - Can be `not-determined`, `granted`, `denied`, `restricted` or `unknown`.
 
-This user consent was not required until macOS 10.14 Mojave, so this method will always return `granted` if your system is running 10.13 High Sierra or lower.
+This user consent was not required on macOS 10.13 High Sierra or lower so this method will always return `granted`.
+macOS 10.14 Mojave or higher requires consent for `microphone` and `camera` access.
+macOS 10.15 Catalina or higher requires consent for `screen` access.
+
+Windows 10 has a global setting controlling `microphone` and `camera` access for all win32 applications.
+It will always return `granted` for `screen` and for all media types on older versions of Windows.
 
 ### `systemPreferences.askForMediaAccess(mediaType)` _macOS_
 
-* `mediaType` String - the type of media being requested; can be `microphone`, `camera`.
+* `mediaType` string - the type of media being requested; can be `microphone`, `camera`.
 
-Returns `Promise<Boolean>` - A promise that resolves with `true` if consent was granted and `false` if it was denied. If an invalid `mediaType` is passed, the promise will be rejected. If an access request was denied and later is changed through the System Preferences pane, a restart of the app will be required for the new permissions to take effect. If access has already been requested and denied, it _must_ be changed through the preference pane; an alert will not pop up and the promise will resolve with the existing access status.
+Returns `Promise<boolean>` - A promise that resolves with `true` if consent was granted and `false` if it was denied. If an invalid `mediaType` is passed, the promise will be rejected. If an access request was denied and later is changed through the System Preferences pane, a restart of the app will be required for the new permissions to take effect. If access has already been requested and denied, it _must_ be changed through the preference pane; an alert will not pop up and the promise will resolve with the existing access status.
 
-**Important:** In order to properly leverage this API, you [must set](https://developer.apple.com/documentation/avfoundation/cameras_and_media_capture/requesting_authorization_for_media_capture_on_macos?language=objc) the `NSMicrophoneUsageDescription` and `NSCameraUsageDescription` strings in your app's `Info.plist` file. The values for these keys will be used to populate the permission dialogs so that the user will be properly informed as to the purpose of the permission request. See [Electron Application Distribution](https://electronjs.org/docs/tutorial/application-distribution#macos) for more information about how to set these in the context of Electron.
+**Important:** In order to properly leverage this API, you [must set](https://developer.apple.com/documentation/avfoundation/cameras_and_media_capture/requesting_authorization_for_media_capture_on_macos?language=objc) the `NSMicrophoneUsageDescription` and `NSCameraUsageDescription` strings in your app's `Info.plist` file. The values for these keys will be used to populate the permission dialogs so that the user will be properly informed as to the purpose of the permission request. See [Electron Application Distribution](../tutorial/application-distribution.md#macos) for more information about how to set these in the context of Electron.
 
 This user consent was not required until macOS 10.14 Mojave, so this method will always return `true` if your system is running 10.13 High Sierra or lower.
 
@@ -434,8 +449,27 @@ This user consent was not required until macOS 10.14 Mojave, so this method will
 
 Returns `Object`:
 
-* `shouldRenderRichAnimation` Boolean - Returns true if rich animations should be rendered. Looks at session type (e.g. remote desktop) and accessibility settings to give guidance for heavy animations.
-* `scrollAnimationsEnabledBySystem` Boolean - Determines on a per-platform basis whether scroll animations (e.g. produced by home/end key) should be enabled.
-* `prefersReducedMotion` Boolean - Determines whether the user desires reduced motion based on platform APIs.
+* `shouldRenderRichAnimation` boolean - Returns true if rich animations should be rendered. Looks at session type (e.g. remote desktop) and accessibility settings to give guidance for heavy animations.
+* `scrollAnimationsEnabledBySystem` boolean - Determines on a per-platform basis whether scroll animations (e.g. produced by home/end key) should be enabled.
+* `prefersReducedMotion` boolean - Determines whether the user desires reduced motion based on platform APIs.
 
 Returns an object with system animation settings.
+
+## Properties
+
+### `systemPreferences.appLevelAppearance` _macOS_
+
+A `string` property that can be `dark`, `light` or `unknown`. It determines the macOS appearance setting for
+your application. This maps to values in: [NSApplication.appearance](https://developer.apple.com/documentation/appkit/nsapplication/2967170-appearance?language=objc). Setting this will override the
+system default as well as the value of `getEffectiveAppearance`.
+
+Possible values that can be set are `dark` and `light`, and possible return values are `dark`, `light`, and `unknown`.
+
+This property is only available on macOS 10.14 Mojave or newer.
+
+### `systemPreferences.effectiveAppearance` _macOS_ _Readonly_
+
+A `string` property that can be `dark`, `light` or `unknown`.
+
+Returns the macOS appearance setting that is currently applied to your application,
+maps to [NSApplication.effectiveAppearance](https://developer.apple.com/documentation/appkit/nsapplication/2967171-effectiveappearance?language=objc)

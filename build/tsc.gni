@@ -21,16 +21,10 @@ template("typescript_build") {
     inputs = [
       invoker.tsconfig,
       "//electron/tsconfig.json",
-      "//electron/package-lock.json",
+      "//electron/yarn.lock",
       "//electron/typings/internal-ambient.d.ts",
       "//electron/typings/internal-electron.d.ts",
-      "//electron/typings/internal-helpers.d.ts",
     ]
-
-    type_roots = "node_modules/@types,typings"
-    if (defined(invoker.type_root)) {
-      type_roots += "," + invoker.type_root
-    }
 
     base_out_path = invoker.output_gen_dir + "/electron/"
     args = [
@@ -38,8 +32,6 @@ template("typescript_build") {
       rebase_path(invoker.tsconfig),
       "--outDir",
       rebase_path("$base_out_path" + invoker.output_dir_name),
-      "--typeRoots",
-      type_roots,
     ]
 
     outputs = []
