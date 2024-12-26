@@ -19,7 +19,7 @@
 #include "content/public/browser/web_contents.h"
 #include "gin/data_object_builder.h"
 #include "shell/browser/api/electron_api_web_contents.h"
-#include "shell/browser/electron_browser_client.h"
+#include "shell/browser/electron_browser_context.h"
 #include "shell/browser/electron_browser_main_parts.h"
 #include "shell/browser/web_contents_permission_helper.h"
 #include "shell/browser/web_contents_preferences.h"
@@ -27,6 +27,7 @@
 #include "shell/common/gin_converters/frame_converter.h"
 #include "shell/common/gin_converters/usb_protected_classes_converter.h"
 #include "shell/common/gin_converters/value_converter.h"
+#include "shell/common/gin_helper/dictionary.h"
 #include "shell/common/gin_helper/event_emitter_caller.h"
 #include "third_party/blink/public/common/permissions/permission_utils.h"
 
@@ -85,7 +86,7 @@ class ElectronPermissionManager::PendingRequest {
     return content::RenderFrameHost::FromID(render_frame_host_id_);
   }
 
-  bool IsComplete() const { return remaining_results_ == 0; }
+  [[nodiscard]] bool IsComplete() const { return remaining_results_ == 0; }
 
   void RunCallback() {
     if (!callback_.is_null()) {
@@ -277,8 +278,7 @@ ElectronPermissionManager::GetPermissionResultForOriginWithoutContext(
     const url::Origin& embedding_origin) {
   blink::mojom::PermissionStatus status = GetPermissionStatus(
       permission, requesting_origin.GetURL(), embedding_origin.GetURL());
-  return content::PermissionResult(
-      status, content::PermissionStatusSource::UNSPECIFIED);
+  return {status, content::PermissionStatusSource::UNSPECIFIED};
 }
 
 void ElectronPermissionManager::CheckBluetoothDevicePair(
@@ -414,19 +414,5 @@ ElectronPermissionManager::GetPermissionStatusForEmbeddedRequester(
       permission, overridden_origin.GetURL(),
       render_frame_host->GetLastCommittedOrigin().GetURL());
 }
-
-ElectronPermissionManager::SubscriptionId
-ElectronPermissionManager::SubscribeToPermissionStatusChange(
-    blink::PermissionType permission,
-    content::RenderProcessHost* render_process_host,
-    content::RenderFrameHost* render_frame_host,
-    const GURL& requesting_origin,
-    bool should_include_device_status,
-    base::RepeatingCallback<void(blink::mojom::PermissionStatus)> callback) {
-  return SubscriptionId();
-}
-
-void ElectronPermissionManager::UnsubscribeFromPermissionStatusChange(
-    SubscriptionId id) {}
 
 }  // namespace electron

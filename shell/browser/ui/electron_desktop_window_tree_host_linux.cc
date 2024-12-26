@@ -13,7 +13,9 @@
 #include "base/feature_list.h"
 #include "base/i18n/rtl.h"
 #include "shell/browser/native_window_features.h"
+#include "shell/browser/native_window_views.h"
 #include "shell/browser/ui/views/client_frame_view_linux.h"
+#include "third_party/skia/include/core/SkRegion.h"
 #include "ui/gfx/geometry/rect.h"
 #include "ui/gfx/geometry/skia_conversions.h"
 #include "ui/linux/linux_ui.h"
@@ -21,7 +23,6 @@
 #include "ui/platform_window/platform_window.h"
 #include "ui/views/widget/desktop_aura/desktop_window_tree_host.h"
 #include "ui/views/widget/desktop_aura/desktop_window_tree_host_linux.h"
-#include "ui/views/window/non_client_view.h"
 
 namespace electron {
 
@@ -48,8 +49,13 @@ void ElectronDesktopWindowTreeHostLinux::OnWidgetInitDone() {
 gfx::Insets ElectronDesktopWindowTreeHostLinux::CalculateInsetsInDIP(
     ui::PlatformWindowState window_state) const {
   // If we are not showing frame, the insets should be zero.
-  if (!native_window_view_->IsFullscreen()) {
-    return gfx::Insets();
+  if (native_window_view_->IsFullscreen()) {
+    return {};
+  }
+
+  if (!native_window_view_->has_frame() ||
+      !native_window_view_->has_client_frame()) {
+    return {};
   }
 
   auto* view = static_cast<ClientFrameViewLinux*>(
@@ -116,12 +122,6 @@ void ElectronDesktopWindowTreeHostLinux::UpdateWindowState(
       break;
     case ui::PlatformWindowState::kUnknown:
     case ui::PlatformWindowState::kNormal:
-    case ui::PlatformWindowState::kSnappedPrimary:
-    case ui::PlatformWindowState::kSnappedSecondary:
-    case ui::PlatformWindowState::kFloated:
-    case ui::PlatformWindowState::kPip:
-    case ui::PlatformWindowState::kPinnedFullscreen:
-    case ui::PlatformWindowState::kTrustedPinnedFullscreen:
       break;
   }
   switch (new_state) {
@@ -136,12 +136,6 @@ void ElectronDesktopWindowTreeHostLinux::UpdateWindowState(
       break;
     case ui::PlatformWindowState::kUnknown:
     case ui::PlatformWindowState::kNormal:
-    case ui::PlatformWindowState::kSnappedPrimary:
-    case ui::PlatformWindowState::kSnappedSecondary:
-    case ui::PlatformWindowState::kFloated:
-    case ui::PlatformWindowState::kPip:
-    case ui::PlatformWindowState::kPinnedFullscreen:
-    case ui::PlatformWindowState::kTrustedPinnedFullscreen:
       break;
   }
   window_state_ = new_state;
@@ -247,8 +241,4 @@ void ElectronDesktopWindowTreeHostLinux::UpdateFrameHints() {
     SizeConstraintsChanged();
   }
 }
-
-void ElectronDesktopWindowTreeHostLinux::UpdateClientDecorationHints(
-    ClientFrameViewLinux* view) {}
-
 }  // namespace electron

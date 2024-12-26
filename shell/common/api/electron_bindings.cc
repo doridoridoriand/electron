@@ -10,16 +10,18 @@
 #include <vector>
 
 #include "base/containers/contains.h"
-#include "base/logging.h"
+#include "base/files/file.h"
 #include "base/process/process.h"
 #include "base/process/process_handle.h"
 #include "base/system/sys_info.h"
+#include "electron/mas.h"
 #include "services/resource_coordinator/public/cpp/memory_instrumentation/global_memory_dump.h"
 #include "services/resource_coordinator/public/cpp/memory_instrumentation/memory_instrumentation.h"
 #include "shell/browser/browser.h"
 #include "shell/common/application_info.h"
 #include "shell/common/gin_converters/file_path_converter.h"
 #include "shell/common/gin_helper/dictionary.h"
+#include "shell/common/gin_helper/locker.h"
 #include "shell/common/gin_helper/microtasks_scope.h"
 #include "shell/common/gin_helper/promise.h"
 #include "shell/common/heap_snapshot.h"
@@ -237,8 +239,9 @@ void ElectronBindings::DidReceiveMemoryDump(
   v8::HandleScope handle_scope(isolate);
   v8::Local<v8::Context> local_context =
       v8::Local<v8::Context>::New(isolate, context);
-  gin_helper::MicrotasksScope microtasks_scope(
-      isolate, local_context->GetMicrotaskQueue(), true);
+  gin_helper::MicrotasksScope microtasks_scope{
+      isolate, local_context->GetMicrotaskQueue(), true,
+      v8::MicrotasksScope::kRunMicrotasks};
   v8::Context::Scope context_scope(local_context);
 
   if (!success) {

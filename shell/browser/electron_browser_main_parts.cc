@@ -19,11 +19,9 @@
 #include "base/path_service.h"
 #include "base/run_loop.h"
 #include "base/strings/string_number_conversions.h"
-#include "base/strings/utf_string_conversions.h"
 #include "base/task/single_thread_task_runner.h"
 #include "chrome/browser/icon_manager.h"
 #include "chrome/browser/ui/color/chrome_color_mixers.h"
-#include "chrome/common/chrome_paths.h"
 #include "chrome/common/chrome_switches.h"
 #include "components/os_crypt/sync/key_storage_config_linux.h"
 #include "components/os_crypt/sync/key_storage_util_linux.h"
@@ -36,6 +34,7 @@
 #include "content/public/browser/child_process_data.h"
 #include "content/public/browser/child_process_security_policy.h"
 #include "content/public/browser/device_service.h"
+#include "content/public/browser/download_manager.h"
 #include "content/public/browser/first_party_sets_handler.h"
 #include "content/public/browser/web_ui_controller_factory.h"
 #include "content/public/common/content_features.h"
@@ -43,12 +42,10 @@
 #include "content/public/common/process_type.h"
 #include "content/public/common/result_codes.h"
 #include "electron/buildflags/buildflags.h"
-#include "electron/fuses.h"
 #include "media/base/localized_strings.h"
 #include "services/network/public/cpp/features.h"
 #include "services/tracing/public/cpp/stack_sampling/tracing_sampler_profiler.h"
 #include "shell/app/electron_main_delegate.h"
-#include "shell/browser/api/electron_api_app.h"
 #include "shell/browser/api/electron_api_utility_process.h"
 #include "shell/browser/browser.h"
 #include "shell/browser/browser_process_impl.h"
@@ -70,10 +67,11 @@
 #include "ui/base/l10n/l10n_util.h"
 #include "ui/base/ui_base_switches.h"
 #include "ui/color/color_provider_manager.h"
+#include "ui/display/screen.h"
+#include "ui/views/layout/layout_provider.h"
+#include "url/url_util.h"
 
 #if defined(USE_AURA)
-#include "ui/display/display.h"
-#include "ui/display/screen.h"
 #include "ui/views/widget/desktop_aura/desktop_screen.h"
 #include "ui/wm/core/wm_state.h"
 #endif
@@ -96,6 +94,7 @@
 #endif
 
 #if BUILDFLAG(IS_WIN)
+#include "chrome/browser/win/chrome_select_file_dialog_factory.h"
 #include "ui/base/l10n/l10n_util_win.h"
 #include "ui/gfx/system_fonts_win.h"
 #include "ui/strings/grit/app_locale_settings.h"
@@ -146,11 +145,6 @@ class LinuxUiGetterImpl : public ui::LinuxUiGetter {
 };
 #endif
 
-template <typename T>
-void Erase(T* container, typename T::iterator iter) {
-  container->erase(iter);
-}
-
 #if BUILDFLAG(IS_WIN)
 int GetMinimumFontSize() {
   int min_font_size;
@@ -169,7 +163,7 @@ std::u16string MediaStringProvider(media::MessageId id) {
       return u"Communications";
 #endif
     default:
-      return std::u16string();
+      return {};
   }
 }
 
@@ -486,6 +480,11 @@ int ElectronBrowserMainParts::PreMainMessageLoopRun() {
 
   fake_browser_process_->PreMainMessageLoopRun();
 
+#if BUILDFLAG(IS_WIN)
+  ui::SelectFileDialog::SetFactory(
+      std::make_unique<ChromeSelectFileDialogFactory>());
+#endif
+
   return GetExitCode();
 }
 
@@ -598,6 +597,7 @@ void ElectronBrowserMainParts::PostMainMessageLoopRun() {
   node_env_->set_trace_sync_io(false);
   js_env_->DestroyMicrotasksRunner();
   node::Stop(node_env_.get(), node::StopFlags::kDoNotTerminateIsolate);
+  node_bindings_->set_uv_env(nullptr);
   node_env_.reset();
 
   auto default_context_key = ElectronBrowserContext::PartitionKey("", false);

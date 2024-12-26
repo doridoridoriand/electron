@@ -1,18 +1,21 @@
+import { app, BrowserWindow, Menu, session, net as electronNet, WebContents, utilityProcess } from 'electron/main';
+
 import { assert, expect } from 'chai';
+import * as semver from 'semver';
+import split = require('split')
+
 import * as cp from 'node:child_process';
-import * as https from 'node:https';
-import * as http from 'node:http';
-import * as net from 'node:net';
+import { once } from 'node:events';
 import * as fs from 'node:fs';
+import * as http from 'node:http';
+import * as https from 'node:https';
+import * as net from 'node:net';
 import * as path from 'node:path';
 import { promisify } from 'node:util';
-import { app, BrowserWindow, Menu, session, net as electronNet, WebContents, utilityProcess } from 'electron/main';
-import { closeWindow, closeAllWindows } from './lib/window-helpers';
-import { ifdescribe, ifit, listen, waitUntil } from './lib/spec-helpers';
+
 import { collectStreamBody, getResponse } from './lib/net-helpers';
-import { once } from 'node:events';
-import split = require('split')
-import * as semver from 'semver';
+import { ifdescribe, ifit, listen, waitUntil } from './lib/spec-helpers';
+import { closeWindow, closeAllWindows } from './lib/window-helpers';
 
 const fixturesPath = path.resolve(__dirname, 'fixtures');
 
@@ -1559,19 +1562,6 @@ describe('app module', () => {
   });
 
   ifdescribe(!(process.platform === 'linux' && (process.arch === 'arm64' || process.arch === 'arm')))('sandbox options', () => {
-    // Our ARM tests are run on VSTS rather than CircleCI, and the Docker
-    // setup on VSTS disallows syscalls that Chrome requires for setting up
-    // sandboxing.
-    // See:
-    // - https://docs.docker.com/engine/security/seccomp/#significant-syscalls-blocked-by-the-default-profile
-    // - https://chromium.googlesource.com/chromium/src/+/70.0.3538.124/sandbox/linux/services/credentials.cc#292
-    // - https://github.com/docker/docker-ce/blob/ba7dfc59ccfe97c79ee0d1379894b35417b40bca/components/engine/profiles/seccomp/seccomp_default.go#L497
-    // - https://blog.jessfraz.com/post/how-to-use-new-docker-seccomp-profiles/
-    //
-    // Adding `--cap-add SYS_ADMIN` or `--security-opt seccomp=unconfined`
-    // to the Docker invocation allows the syscalls that Chrome needs, but
-    // are probably more permissive than we'd like.
-
     let appProcess: cp.ChildProcess = null as any;
     let server: net.Server = null as any;
     const socketPath = process.platform === 'win32' ? '\\\\.\\pipe\\electron-mixed-sandbox' : '/tmp/electron-mixed-sandbox';
@@ -2167,6 +2157,10 @@ describe('default behavior', () => {
       });
 
       serverUrl = (await listen(server)).url;
+    });
+
+    after(() => {
+      server.close();
     });
 
     it('should emit a login event on app when a WebContents hits a 401', async () => {

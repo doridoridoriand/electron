@@ -105,8 +105,10 @@ auto_filenames = {
     "docs/api/structures/mime-typed-buffer.md",
     "docs/api/structures/mouse-input-event.md",
     "docs/api/structures/mouse-wheel-input-event.md",
+    "docs/api/structures/navigation-entry.md",
     "docs/api/structures/notification-action.md",
     "docs/api/structures/notification-response.md",
+    "docs/api/structures/offscreen-shared-texture.md",
     "docs/api/structures/open-external-permission-request.md",
     "docs/api/structures/payment-discount.md",
     "docs/api/structures/permission-request.md",
@@ -131,6 +133,8 @@ auto_filenames = {
     "docs/api/structures/segmented-control-segment.md",
     "docs/api/structures/serial-port.md",
     "docs/api/structures/service-worker-info.md",
+    "docs/api/structures/shared-dictionary-info.md",
+    "docs/api/structures/shared-dictionary-usage-info.md",
     "docs/api/structures/shared-worker-info.md",
     "docs/api/structures/sharing-item.md",
     "docs/api/structures/shortcut-details.md",
@@ -149,6 +153,7 @@ auto_filenames = {
     "docs/api/structures/web-request-filter.md",
     "docs/api/structures/web-source.md",
     "docs/api/structures/window-open-handler-response.md",
+    "docs/api/structures/window-session-end-event.md",
   ]
 
   sandbox_bundle_deps = [
@@ -354,6 +359,7 @@ auto_filenames = {
     "lib/browser/message-port-main.ts",
     "lib/common/api/net-client-request.ts",
     "lib/common/define-properties.ts",
+    "lib/common/deprecate.ts",
     "lib/common/init.ts",
     "lib/common/webpack-globals-provider.ts",
     "lib/utility/api/exports/electron.ts",

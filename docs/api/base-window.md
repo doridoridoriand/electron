@@ -64,6 +64,31 @@ const child = new BaseWindow({ parent, modal: true })
 * On Linux the type of modal windows will be changed to `dialog`.
 * On Linux many desktop environments do not support hiding a modal window.
 
+## Resource management
+
+When you add a [`WebContentsView`](web-contents-view.md) to a `BaseWindow` and the `BaseWindow`
+is closed, the [`webContents`](web-contents.md) of the `WebContentsView` are not destroyed
+automatically.
+
+It is your responsibility to close the `webContents` when you no longer need them, e.g. when
+the `BaseWindow` is closed:
+
+```js
+const { BaseWindow, WebContentsView } = require('electron')
+
+const win = new BaseWindow({ width: 800, height: 600 })
+
+const view = new WebContentsView()
+win.contentView.addChildView(view)
+
+win.on('closed', () => {
+  view.webContents.close()
+})
+```
+
+Unlike with a [`BrowserWindow`](browser-window.md), if you don't explicitly close the
+`webContents`, you'll encounter memory leaks.
+
 ## Class: BaseWindow
 
 > Create and control windows.
@@ -119,16 +144,38 @@ _**Note**: There is a subtle difference between the behaviors of `window.onbefor
 Emitted when the window is closed. After you have received this event you should
 remove the reference to the window and avoid using it any more.
 
+#### Event: 'query-session-end' _Windows_
+
+Returns:
+
+* `event` [WindowSessionEndEvent][window-session-end-event]
+
+Emitted when a session is about to end due to a shutdown, machine restart, or user log-off.
+Calling `event.preventDefault()` can delay the system shutdown, though it’s generally best
+to respect the user’s choice to end the session. However, you may choose to use it if
+ending the session puts the user at risk of losing data.
+
 #### Event: 'session-end' _Windows_
 
-Emitted when window session is going to end due to force shutdown or machine restart
-or session log off.
+Returns:
+
+* `event` [WindowSessionEndEvent][window-session-end-event]
+
+Emitted when a session is about to end due to a shutdown, machine restart, or user log-off. Once this event fires, there is no way to prevent the session from ending.
 
 #### Event: 'blur'
+
+Returns:
+
+* `event` Event
 
 Emitted when the window loses focus.
 
 #### Event: 'focus'
+
+Returns:
+
+* `event` Event
 
 Emitted when the window gains focus.
 
@@ -479,7 +526,7 @@ Sets the content view of the window.
 
 #### `win.getContentView()`
 
-Returns [View](view.md) - The content view of the window.
+Returns [`View`](view.md) - The content view of the window.
 
 #### `win.destroy()`
 
@@ -926,6 +973,17 @@ win.setSheetOffset(toolbarRect.height)
 
 #### `win.flashFrame(flag)`
 
+<!--
+```YAML history
+added:
+  - pr-url: https://github.com/electron/electron/pull/35658
+changes:
+  - pr-url: https://github.com/electron/electron/pull/41391
+    description: "`window.flashFrame(bool)` will flash dock icon continuously on macOS"
+    breaking-changes-header: behavior-changed-windowflashframebool-will-flash-dock-icon-continuously-on-macos
+```
+-->
+
 * `flag` boolean
 
 Starts or stops flashing the window to attract user's attention.
@@ -1370,17 +1428,19 @@ machine has a touch bar.
 **Note:** The TouchBar API is currently experimental and may change or be
 removed in future Electron releases.
 
-#### `win.setTitleBarOverlay(options)` _Windows_
+#### `win.setTitleBarOverlay(options)` _Windows_ _Linux_
 
 * `options` Object
-  * `color` String (optional) _Windows_ - The CSS color of the Window Controls Overlay when enabled.
-  * `symbolColor` String (optional) _Windows_ - The CSS color of the symbols on the Window Controls Overlay when enabled.
-  * `height` Integer (optional) _Windows_ - The height of the title bar and Window Controls Overlay in pixels.
+  * `color` String (optional) - The CSS color of the Window Controls Overlay when enabled.
+  * `symbolColor` String (optional) - The CSS color of the symbols on the Window Controls Overlay when enabled.
+  * `height` Integer (optional) - The height of the title bar and Window Controls Overlay in pixels.
 
-On a Window with Window Controls Overlay already enabled, this method updates
-the style of the title bar overlay.
+On a Window with Window Controls Overlay already enabled, this method updates the style of the title bar overlay.
+
+On Linux, the `symbolColor` is automatically calculated to have minimum accessible contrast to the `color` if not explicitly set.
 
 [quick-look]: https://en.wikipedia.org/wiki/Quick_Look
 [vibrancy-docs]: https://developer.apple.com/documentation/appkit/nsvisualeffectview?preferredLanguage=objc
 [window-levels]: https://developer.apple.com/documentation/appkit/nswindow/level
 [event-emitter]: https://nodejs.org/api/events.html#events_class_eventemitter
+[window-session-end-event]:../api/structures/window-session-end-event.md

@@ -9,12 +9,12 @@
 
 #include "base/containers/contains.h"
 #include "base/observer_list.h"
-#include "base/observer_list_types.h"
 #include "base/scoped_observation.h"
 #include "content/public/browser/render_frame_host.h"
 #include "content/public/browser/web_contents.h"
 #include "electron/buildflags/buildflags.h"
 #include "services/device/public/mojom/usb_enumeration_options.mojom.h"
+#include "shell/browser/electron_browser_context.h"
 #include "shell/browser/electron_permission_manager.h"
 #include "shell/browser/usb/usb_chooser_context.h"
 #include "shell/browser/usb/usb_chooser_context_factory.h"

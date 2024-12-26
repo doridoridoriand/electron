@@ -14,10 +14,12 @@
 #include "content/public/common/color_parser.h"
 #include "electron/buildflags/buildflags.h"
 #include "gin/dictionary.h"
+#include "gin/handle.h"
 #include "shell/browser/api/electron_api_menu.h"
 #include "shell/browser/api/electron_api_view.h"
 #include "shell/browser/api/electron_api_web_contents.h"
 #include "shell/browser/javascript_environment.h"
+#include "shell/browser/native_window.h"
 #include "shell/common/color_util.h"
 #include "shell/common/gin_converters/callback_converter.h"
 #include "shell/common/gin_converters/file_path_converter.h"
@@ -40,6 +42,8 @@
 #include "shell/browser/ui/views/win_frame_view.h"
 #include "shell/browser/ui/win/taskbar_host.h"
 #include "ui/base/win/shell.h"
+#elif BUILDFLAG(IS_LINUX)
+#include "shell/browser/ui/views/opaque_frame_view.h"
 #endif
 
 #if BUILDFLAG(IS_WIN)
@@ -48,7 +52,7 @@ namespace gin {
 template <>
 struct Converter<electron::TaskbarHost::ThumbarButton> {
   static bool FromV8(v8::Isolate* isolate,
-                     v8::Handle<v8::Value> val,
+                     v8::Local<v8::Value> val,
                      electron::TaskbarHost::ThumbarButton* out) {
     gin::Dictionary dict(isolate);
     if (!gin::ConvertFromV8(isolate, val, &dict))
@@ -94,8 +98,8 @@ BaseWindow::BaseWindow(v8::Isolate* isolate,
   }
 
   // Creates NativeWindow.
-  window_.reset(NativeWindow::Create(
-      options, parent.IsEmpty() ? nullptr : parent->window_.get()));
+  window_ = NativeWindow::Create(
+      options, parent.IsEmpty() ? nullptr : parent->window_.get());
   window_->AddObserver(this);
 
   SetContentView(View::Create(isolate));
@@ -118,6 +122,11 @@ BaseWindow::BaseWindow(gin_helper::Arguments* args,
 
 BaseWindow::~BaseWindow() {
   CloseImmediately();
+
+  // Destroy the native window in next tick because the native code might be
+  // iterating all windows.
+  base::SingleThreadTaskRunner::GetCurrentDefault()->DeleteSoon(
+      FROM_HERE, window_.release());
 
   // Remove global reference so the JS object can be garbage collected.
   self_ref_.Reset();
@@ -168,8 +177,37 @@ void BaseWindow::OnWindowClosed() {
       FROM_HERE, GetDestroyClosure());
 }
 
-void BaseWindow::OnWindowEndSession() {
-  Emit("session-end");
+void BaseWindow::OnWindowQueryEndSession(
+    const std::vector<std::string>& reasons,
+    bool* prevent_default) {
+  v8::Isolate* isolate = JavascriptEnvironment::GetIsolate();
+  v8::HandleScope handle_scope(isolate);
+
+  gin::Handle<gin_helper::internal::Event> event =
+      gin_helper::internal::Event::New(isolate);
+  v8::Local<v8::Object> event_object = event.ToV8().As<v8::Object>();
+
+  gin::Dictionary dict(isolate, event_object);
+  dict.Set("reasons", reasons);
+
+  EmitWithoutEvent("query-session-end", event);
+  if (event->GetDefaultPrevented()) {
+    *prevent_default = true;
+  }
+}
+
+void BaseWindow::OnWindowEndSession(const std::vector<std::string>& reasons) {
+  v8::Isolate* isolate = JavascriptEnvironment::GetIsolate();
+  v8::HandleScope handle_scope(isolate);
+
+  gin::Handle<gin_helper::internal::Event> event =
+      gin_helper::internal::Event::New(isolate);
+  v8::Local<v8::Object> event_object = event.ToV8().As<v8::Object>();
+
+  gin::Dictionary dict(isolate, event_object);
+  dict.Set("reasons", reasons);
+
+  EmitWithoutEvent("session-end", event);
 }
 
 void BaseWindow::OnWindowBlur() {
@@ -276,7 +314,7 @@ void BaseWindow::OnWindowAlwaysOnTopChanged() {
   Emit("always-on-top-changed", IsAlwaysOnTop());
 }
 
-void BaseWindow::OnExecuteAppCommand(const std::string& command_name) {
+void BaseWindow::OnExecuteAppCommand(const std::string_view command_name) {
   Emit("app-command", command_name);
 }
 
@@ -631,7 +669,7 @@ void BaseWindow::SetBackgroundColor(const std::string& color_name) {
   window_->SetBackgroundColor(color);
 }
 
-std::string BaseWindow::GetBackgroundColor(gin_helper::Arguments* args) const {
+std::string BaseWindow::GetBackgroundColor() const {
   return ToRGBHex(window_->GetBackgroundColor());
 }
 
@@ -801,9 +839,18 @@ void BaseWindow::SetAutoHideCursor(bool auto_hide) {
   window_->SetAutoHideCursor(auto_hide);
 }
 
-void BaseWindow::SetVibrancy(v8::Isolate* isolate, v8::Local<v8::Value> value) {
+void BaseWindow::SetVibrancy(v8::Isolate* isolate,
+                             v8::Local<v8::Value> value,
+                             gin_helper::Arguments* args) {
   std::string type = gin::V8ToString(isolate, value);
-  window_->SetVibrancy(type);
+  gin_helper::Dictionary options;
+  int animation_duration_ms = 0;
+
+  if (args->GetNext(&options)) {
+    options.Get("animationDuration", &animation_duration_ms);
+  }
+
+  window_->SetVibrancy(type, animation_duration_ms);
 }
 
 void BaseWindow::SetBackgroundMaterial(const std::string& material_type) {
@@ -1041,11 +1088,13 @@ void BaseWindow::SetAppDetails(const gin_helper::Dictionary& options) {
                                   relaunch_command, relaunch_display_name,
                                   window_->GetAcceleratedWidget());
 }
+#endif
 
+#if BUILDFLAG(IS_WIN) || BUILDFLAG(IS_LINUX)
 void BaseWindow::SetTitleBarOverlay(const gin_helper::Dictionary& options,
                                     gin_helper::Arguments* args) {
   // Ensure WCO is already enabled on this window
-  if (!window_->titlebar_overlay_enabled()) {
+  if (!window_->IsWindowControlsOverlayEnabled()) {
     args->ThrowError("Titlebar overlay is not enabled");
     return;
   }
@@ -1090,13 +1139,18 @@ void BaseWindow::SetTitleBarOverlay(const gin_helper::Dictionary& options,
     updated = true;
   }
 
-  // If anything was updated, invalidate the layout and schedule a paint of the
-  // window's frame view
-  if (updated) {
-    auto* frame_view = static_cast<WinFrameView*>(
-        window->widget()->non_client_view()->frame_view());
-    frame_view->InvalidateCaptionButtons();
-  }
+  if (!updated)
+    return;
+
+    // If anything was updated, ensure the overlay is repainted.
+#if BUILDFLAG(IS_WIN)
+  auto* frame_view = static_cast<WinFrameView*>(
+      window->widget()->non_client_view()->frame_view());
+#else
+  auto* frame_view = static_cast<OpaqueFrameView*>(
+      window->widget()->non_client_view()->frame_view());
+#endif
+  frame_view->InvalidateCaptionButtons();
 }
 #endif
 
@@ -1235,7 +1289,6 @@ void BaseWindow::BuildPrototype(v8::Isolate* isolate,
       .SetMethod("setHiddenInMissionControl",
                  &BaseWindow::SetHiddenInMissionControl)
 #endif
-
       .SetMethod("_setTouchBarItems", &BaseWindow::SetTouchBar)
       .SetMethod("_refreshTouchBarItem", &BaseWindow::RefreshTouchBarItem)
       .SetMethod("_setEscapeTouchBarItem", &BaseWindow::SetEscapeTouchBarItem)
@@ -1286,6 +1339,8 @@ void BaseWindow::BuildPrototype(v8::Isolate* isolate,
       .SetMethod("setThumbnailClip", &BaseWindow::SetThumbnailClip)
       .SetMethod("setThumbnailToolTip", &BaseWindow::SetThumbnailToolTip)
       .SetMethod("setAppDetails", &BaseWindow::SetAppDetails)
+#endif
+#if BUILDFLAG(IS_WIN) || BUILDFLAG(IS_LINUX)
       .SetMethod("setTitleBarOverlay", &BaseWindow::SetTitleBarOverlay)
 #endif
       .SetProperty("id", &BaseWindow::GetID);

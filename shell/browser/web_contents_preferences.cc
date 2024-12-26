@@ -13,9 +13,7 @@
 #include "base/command_line.h"
 #include "base/containers/fixed_flat_map.h"
 #include "base/memory/ptr_util.h"
-#include "base/strings/utf_string_conversions.h"
 #include "cc/base/switches.h"
-#include "content/public/browser/render_frame_host.h"
 #include "content/public/browser/render_process_host.h"
 #include "content/public/browser/web_contents_user_data.h"
 #include "content/public/common/content_switches.h"
@@ -258,14 +256,6 @@ void WebContentsPreferences::SetFromDictionary(
   SaveLastPreferences();
 }
 
-bool WebContentsPreferences::GetSafeDialogsMessage(std::string* message) const {
-  if (safe_dialogs_message_) {
-    *message = *safe_dialogs_message_;
-    return true;
-  }
-  return false;
-}
-
 bool WebContentsPreferences::SetImageAnimationPolicy(std::string policy) {
   if (policy == "animate") {
     image_animation_policy_ =
@@ -278,15 +268,6 @@ bool WebContentsPreferences::SetImageAnimationPolicy(std::string policy) {
   } else if (policy == "noAnimation") {
     image_animation_policy_ =
         blink::mojom::ImageAnimationPolicy::kImageAnimationPolicyNoAnimation;
-    return true;
-  }
-  return false;
-}
-
-bool WebContentsPreferences::GetPreloadPath(base::FilePath* path) const {
-  DCHECK(path);
-  if (preload_path_) {
-    *path = *preload_path_;
     return true;
   }
   return false;

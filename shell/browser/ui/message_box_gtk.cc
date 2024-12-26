@@ -7,7 +7,6 @@
 #include "base/containers/contains.h"
 #include "base/containers/flat_map.h"
 #include "base/functional/bind.h"
-#include "base/functional/callback.h"
 #include "base/memory/raw_ptr.h"
 #include "base/memory/raw_ptr_exclusion.h"
 #include "base/no_destructor.h"
@@ -102,11 +101,10 @@ class GtkMessageBox : private NativeWindowObserver {
     // Add buttons.
     GtkDialog* dialog = GTK_DIALOG(dialog_);
     if (settings.buttons.size() == 0) {
-      gtk_dialog_add_button(dialog, TranslateToStock(0, "OK"), 0);
+      gtk_dialog_add_button(dialog, TranslateToStock("OK"), 0);
     } else {
       for (size_t i = 0; i < settings.buttons.size(); ++i) {
-        gtk_dialog_add_button(dialog, TranslateToStock(i, settings.buttons[i]),
-                              i);
+        gtk_dialog_add_button(dialog, TranslateToStock(settings.buttons[i]), i);
       }
     }
     gtk_dialog_set_default_response(dialog, settings.default_id);
@@ -147,16 +145,20 @@ class GtkMessageBox : private NativeWindowObserver {
     }
   }
 
-  const char* TranslateToStock(int id, const std::string& text) {
+  static const char* TranslateToStock(const std::string& text) {
     const std::string lower = base::ToLowerASCII(text);
-    if (lower == "cancel")
+    if (lower == "cancel") {
       return gtk_util::GetCancelLabel();
-    if (lower == "no")
+    }
+    if (lower == "no") {
       return gtk_util::GetNoLabel();
-    if (lower == "ok")
+    }
+    if (lower == "ok") {
       return gtk_util::GetOkLabel();
-    if (lower == "yes")
+    }
+    if (lower == "yes") {
       return gtk_util::GetYesLabel();
+    }
     return text.c_str();
   }
 

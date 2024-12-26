@@ -1,3 +1,5 @@
+const minimist = require('minimist');
+
 const cp = require('node:child_process');
 const fs = require('node:fs');
 const path = require('node:path');
@@ -13,17 +15,25 @@ if (!require.main) {
   throw new Error('Must call the nan spec runner directly');
 }
 
-const args = require('minimist')(process.argv.slice(2), {
+const args = minimist(process.argv.slice(2), {
   string: ['only']
 });
+
+const getNodeGypVersion = () => {
+  const nanPackageJSONPath = path.join(NAN_DIR, 'package.json');
+  const nanPackageJSON = JSON.parse(fs.readFileSync(nanPackageJSONPath, 'utf8'));
+  const { devDependencies } = nanPackageJSON;
+  const nodeGypVersion = devDependencies['node-gyp'];
+  return nodeGypVersion || 'latest';
+};
 
 async function main () {
   const outDir = utils.getOutDir({ shouldLog: true });
   const nodeDir = path.resolve(BASE, 'out', outDir, 'gen', 'node_headers');
   const env = {
+    npm_config_msvs_version: '2022',
     ...process.env,
     npm_config_nodedir: nodeDir,
-    npm_config_msvs_version: '2019',
     npm_config_arch: process.env.NPM_CONFIG_ARCH,
     npm_config_yes: 'true'
   };
@@ -90,7 +100,8 @@ async function main () {
     env.LDFLAGS = ldflags;
   }
 
-  const { status: buildStatus, signal } = cp.spawnSync(NPX_CMD, ['node-gyp', 'rebuild', '--verbose', '--directory', 'test', '-j', 'max'], {
+  const nodeGypVersion = getNodeGypVersion();
+  const { status: buildStatus, signal } = cp.spawnSync(NPX_CMD, [`node-gyp@${nodeGypVersion}`, 'rebuild', '--verbose', '--directory', 'test', '-j', 'max'], {
     env,
     cwd: NAN_DIR,
     stdio: 'inherit',
@@ -118,7 +129,9 @@ async function main () {
 
   const DISABLED_TESTS = new Set([
     'nannew-test.js',
-    'buffer-test.js'
+    'buffer-test.js',
+    // we can't patch this test because it uses CRLF line endings
+    'methodswithdata-test.js'
   ]);
   const testsToRun = fs.readdirSync(path.resolve(NAN_DIR, 'test', 'js'))
     .filter(test => !DISABLED_TESTS.has(test))

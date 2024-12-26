@@ -9,6 +9,7 @@
 #include "shell/browser/api/electron_api_web_contents.h"
 #include "shell/browser/browser.h"
 #include "shell/browser/native_window.h"
+#include "shell/browser/ui/inspectable_web_contents.h"
 #include "shell/browser/ui/inspectable_web_contents_view.h"
 #include "shell/browser/web_contents_preferences.h"
 #include "shell/common/gin_converters/gfx_converter.h"
@@ -20,18 +21,35 @@
 #include "shell/common/options_switches.h"
 #include "third_party/skia/include/core/SkRegion.h"
 #include "ui/base/hit_test.h"
+#include "ui/gfx/geometry/rounded_corners_f.h"
+#include "ui/views/controls/webview/webview.h"
 #include "ui/views/layout/flex_layout_types.h"
 #include "ui/views/view_class_properties.h"
 #include "ui/views/widget/widget.h"
+
+#if BUILDFLAG(IS_MAC)
+#include "shell/browser/ui/cocoa/delayed_native_view_host.h"
+#endif
 
 namespace electron::api {
 
 WebContentsView::WebContentsView(v8::Isolate* isolate,
                                  gin::Handle<WebContents> web_contents)
-    : View(web_contents->inspectable_web_contents()->GetView()),
+#if BUILDFLAG(IS_MAC)
+    : View(new DelayedNativeViewHost(web_contents->inspectable_web_contents()
+                                         ->GetView()
+                                         ->GetNativeView())),
+#else
+    : View(web_contents->inspectable_web_contents()->GetView()->GetView()),
+#endif
       web_contents_(isolate, web_contents.ToV8()),
       api_web_contents_(web_contents.get()) {
+#if !BUILDFLAG(IS_MAC)
+  // On macOS the View is a newly-created |DelayedNativeViewHost| and it is our
+  // responsibility to delete it. On other platforms the View is created and
+  // managed by InspectableWebContents.
   set_delete_view(false);
+#endif
   view()->SetProperty(
       views::kFlexBehaviorKey,
       views::FlexSpecification(views::MinimumFlexSizeRule::kScaleToMinimum,
@@ -48,7 +66,7 @@ gin::Handle<WebContents> WebContentsView::GetWebContents(v8::Isolate* isolate) {
   if (api_web_contents_)
     return gin::CreateHandle(isolate, api_web_contents_.get());
   else
-    return gin::Handle<WebContents>();
+    return {};
 }
 
 void WebContentsView::SetBackgroundColor(std::optional<WrappedSkColor> color) {
@@ -62,6 +80,18 @@ void WebContentsView::SetBackgroundColor(std::optional<WrappedSkColor> color) {
     if (web_preferences) {
       web_preferences->SetBackgroundColor(color);
     }
+  }
+}
+
+void WebContentsView::SetBorderRadius(int radius) {
+  View::SetBorderRadius(radius);
+  ApplyBorderRadius();
+}
+
+void WebContentsView::ApplyBorderRadius() {
+  if (border_radius().has_value() && api_web_contents_ && view()->GetWidget()) {
+    auto* view = api_web_contents_->inspectable_web_contents()->GetView();
+    view->SetCornerRadii(gfx::RoundedCornersF(border_radius().value()));
   }
 }
 
@@ -85,21 +115,23 @@ void WebContentsView::WebContentsDestroyed() {
 void WebContentsView::OnViewAddedToWidget(views::View* observed_view) {
   DCHECK_EQ(observed_view, view());
   views::Widget* widget = view()->GetWidget();
-  auto* native_window = static_cast<NativeWindow*>(
-      widget->GetNativeWindowProperty(electron::kElectronNativeWindowKey));
+  auto* native_window =
+      static_cast<NativeWindow*>(widget->GetNativeWindowProperty(
+          electron::kElectronNativeWindowKey.c_str()));
   if (!native_window)
     return;
   // We don't need to call SetOwnerWindow(nullptr) in OnViewRemovedFromWidget
   // because that's handled in the WebContents dtor called prior.
   api_web_contents_->SetOwnerWindow(native_window);
   native_window->AddDraggableRegionProvider(this);
+  ApplyBorderRadius();
 }
 
 void WebContentsView::OnViewRemovedFromWidget(views::View* observed_view) {
   DCHECK_EQ(observed_view, view());
   views::Widget* widget = view()->GetWidget();
   auto* native_window = static_cast<NativeWindow*>(
-      widget->GetNativeWindowProperty(kElectronNativeWindowKey));
+      widget->GetNativeWindowProperty(kElectronNativeWindowKey.c_str()));
   if (!native_window)
     return;
   native_window->RemoveDraggableRegionProvider(this);
@@ -121,7 +153,7 @@ gin::Handle<WebContentsView> WebContentsView::Create(
     if (gin::ConvertFromV8(isolate, web_contents_view_obj, &web_contents_view))
       return web_contents_view;
   }
-  return gin::Handle<WebContentsView>();
+  return {};
 }
 
 // static
@@ -198,6 +230,7 @@ void WebContentsView::BuildPrototype(
   prototype->SetClassName(gin::StringToV8(isolate, "WebContentsView"));
   gin_helper::ObjectTemplateBuilder(isolate, prototype->PrototypeTemplate())
       .SetMethod("setBackgroundColor", &WebContentsView::SetBackgroundColor)
+      .SetMethod("setBorderRadius", &WebContentsView::SetBorderRadius)
       .SetProperty("webContents", &WebContentsView::GetWebContents);
 }
 

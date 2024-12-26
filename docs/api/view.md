@@ -55,6 +55,8 @@ it becomes the topmost view.
 
 * `view` View - Child view to remove.
 
+If the view passed as a parameter is not a child of this view, this method is a no-op.
+
 #### `view.setBounds(bounds)`
 
 * `bounds` [Rectangle](structures/rectangle.md) - New bounds of the View.
@@ -93,6 +95,12 @@ Examples of valid `color` values:
     * e.g. `blueviolet` or `red`
 
 **Note:** Hex format with alpha takes `AARRGGBB` or `ARGB`, _not_ `RRGGBBAA` or `RGB`.
+
+#### `view.setBorderRadius(radius)`
+
+* `radius` Integer - Border radius size in pixels.
+
+**Note:** The area cutout of the view's border still captures clicks.
 
 #### `view.setVisible(visible)`
 

@@ -9,10 +9,10 @@ is needed for OSR.
 Originally landed in https://github.com/electron/libchromiumcontent/pull/226.
 
 diff --git a/content/browser/web_contents/web_contents_impl.cc b/content/browser/web_contents/web_contents_impl.cc
-index 0a548b96a53454313fe0175a2fa3da7e7b92346f..bfef0d4ad7d543bd0f7cc5b0e57d067c1d8fc944 100644
+index f0d92a18c0cdefd437086695e122c81ca9293ce5..7c348b55b7316b8452dfb9fc43846544af9f04ed 100644
 --- a/content/browser/web_contents/web_contents_impl.cc
 +++ b/content/browser/web_contents/web_contents_impl.cc
-@@ -3609,6 +3609,13 @@ void WebContentsImpl::Init(const WebContents::CreateParams& params,
+@@ -3789,6 +3789,13 @@ void WebContentsImpl::Init(const WebContents::CreateParams& params,
        params.main_frame_name, GetOpener(), primary_main_frame_policy,
        base::UnguessableToken::Create());
  
@@ -26,7 +26,7 @@ index 0a548b96a53454313fe0175a2fa3da7e7b92346f..bfef0d4ad7d543bd0f7cc5b0e57d067c
    std::unique_ptr<WebContentsViewDelegate> delegate =
        GetContentClient()->browser()->GetWebContentsViewDelegate(this);
  
-@@ -3619,6 +3626,7 @@ void WebContentsImpl::Init(const WebContents::CreateParams& params,
+@@ -3799,6 +3806,7 @@ void WebContentsImpl::Init(const WebContents::CreateParams& params,
      view_ = CreateWebContentsView(this, std::move(delegate),
                                    &render_view_host_delegate_view_);
    }
@@ -35,11 +35,11 @@ index 0a548b96a53454313fe0175a2fa3da7e7b92346f..bfef0d4ad7d543bd0f7cc5b0e57d067c
    CHECK(view_.get());
  
 diff --git a/content/public/browser/web_contents.h b/content/public/browser/web_contents.h
-index 4d573eb5d291776143c7f3a32192d20df3ec99d7..370f4e32bd3a5d8a9d3ff73f90a74c5c091a802d 100644
+index c601698c6032d5b147c67b0ff7caf6a8747b3ece..973a3010d4eff81dfded3d5c7bc52a7976f279cf 100644
 --- a/content/public/browser/web_contents.h
 +++ b/content/public/browser/web_contents.h
-@@ -104,10 +104,13 @@ class BrowserContext;
- class BrowserPluginGuestDelegate;
+@@ -113,10 +113,13 @@ class BrowserPluginGuestDelegate;
+ class GuestPageHolder;
  class RenderFrameHost;
  class RenderViewHost;
 +class RenderViewHostDelegateView;
@@ -52,7 +52,7 @@ index 4d573eb5d291776143c7f3a32192d20df3ec99d7..370f4e32bd3a5d8a9d3ff73f90a74c5c
  class WebUI;
  struct DropData;
  struct MHTMLGenerationParams;
-@@ -254,6 +257,10 @@ class WebContents : public PageNavigator,
+@@ -277,6 +280,10 @@ class WebContents : public PageNavigator, public base::SupportsUserData {
      network::mojom::WebSandboxFlags starting_sandbox_flags =
          network::mojom::WebSandboxFlags::kNone;
  
@@ -61,5 +61,5 @@ index 4d573eb5d291776143c7f3a32192d20df3ec99d7..370f4e32bd3a5d8a9d3ff73f90a74c5c
 +    raw_ptr<content::RenderViewHostDelegateView> delegate_view = nullptr;
 +
      // Value used to set the last time the WebContents was made active, this is
-     // the value that'll be returned by GetLastActiveTime(). If this is left
-     // default initialized then the value is not passed on to the WebContents
+     // the value that'll be returned by GetLastActiveTimeTicks(). If this is
+     // left default initialized then the value is not passed on to the

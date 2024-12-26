@@ -8,9 +8,8 @@
 #include <string>
 
 #include "base/containers/span.h"
-#include "base/strings/utf_string_conversions.h"
 #include "chrome/common/extensions/chrome_manifest_url_handlers.h"
-#include "chrome/common/extensions/manifest_handlers/minimum_chrome_version_checker.h"
+#include "chrome/common/extensions/manifest_handlers/minimum_chrome_version_checker.h"  // nogncheck
 #include "electron/buildflags/buildflags.h"
 #include "electron/shell/common/extensions/api/generated_schemas.h"
 #include "extensions/common/alias.h"
@@ -28,6 +27,7 @@
 #include "shell/common/extensions/api/permission_features.h"
 
 namespace extensions {
+namespace {
 
 constexpr APIPermissionInfo::InitInfo permissions_to_register[] = {
     {mojom::APIPermissionID::kDevtools, "devtools",
@@ -46,12 +46,13 @@ constexpr APIPermissionInfo::InitInfo permissions_to_register[] = {
      APIPermissionInfo::kFlagRequiresManagementUIWarning},
 };
 base::span<const APIPermissionInfo::InitInfo> GetPermissionInfos() {
-  return base::make_span(permissions_to_register);
+  return base::span(permissions_to_register);
 }
 base::span<const Alias> GetPermissionAliases() {
-  return base::span<const Alias>();
+  return {};
 }
 
+}  // namespace
 }  // namespace extensions
 
 namespace electron {

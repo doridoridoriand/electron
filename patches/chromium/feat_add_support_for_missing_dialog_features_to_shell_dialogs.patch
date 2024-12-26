@@ -8,88 +8,37 @@ This CL adds support for the following features to //shell_dialogs:
 * showHiddenFiles - Show hidden files in dialog.
 * showOverwriteConfirmation - Whether the user will be presented a confirmation dialog if the user types a file name that already exists.
 
+It also:
+* Changes XDG Portal implementation behavior to set default path regardless of dialog type.
+
 This may be partially upstreamed to Chromium in the future.
 
 diff --git a/ui/gtk/select_file_dialog_linux_gtk.cc b/ui/gtk/select_file_dialog_linux_gtk.cc
-index 129979e844581e68fdecde87bd52f3344f88022a..5e02a36e5e9eb4db84700dd9a0b8765dec18c236 100644
+index b83f0177a2adb0a19be49684f865941e6708f626..f313c766ddc2b79f082e70138dd566a846f0d923 100644
 --- a/ui/gtk/select_file_dialog_linux_gtk.cc
 +++ b/ui/gtk/select_file_dialog_linux_gtk.cc
-@@ -243,6 +243,10 @@ void SelectFileDialogLinuxGtk::SelectFileImpl(
- 
-   std::string title_string = base::UTF16ToUTF8(title);
- 
-+  ExtraSettings extra_settings;
-+  if (params)
-+    extra_settings = *(static_cast<ExtraSettings*>(params));
-+
-   set_file_type_index(file_type_index);
-   if (file_types)
-     set_file_types(*file_types);
-@@ -261,23 +265,23 @@ void SelectFileDialogLinuxGtk::SelectFileImpl(
-     case SELECT_UPLOAD_FOLDER:
-     case SELECT_EXISTING_FOLDER:
-       dialog = CreateSelectFolderDialog(type, title_string, default_path,
--                                        owning_window);
-+                                        owning_window, extra_settings);
-       connect("response",
-               &SelectFileDialogLinuxGtk::OnSelectSingleFolderDialogResponse);
-       break;
-     case SELECT_OPEN_FILE:
--      dialog = CreateFileOpenDialog(title_string, default_path, owning_window);
-+      dialog = CreateFileOpenDialog(title_string, default_path, owning_window, extra_settings);
-       connect("response",
-               &SelectFileDialogLinuxGtk::OnSelectSingleFileDialogResponse);
-       break;
-     case SELECT_OPEN_MULTI_FILE:
-       dialog =
--          CreateMultiFileOpenDialog(title_string, default_path, owning_window);
-+          CreateMultiFileOpenDialog(title_string, default_path, owning_window, extra_settings);
-       connect("response",
-               &SelectFileDialogLinuxGtk::OnSelectMultiFileDialogResponse);
-       break;
-     case SELECT_SAVEAS_FILE:
--      dialog = CreateSaveAsDialog(title_string, default_path, owning_window);
-+      dialog = CreateSaveAsDialog(title_string, default_path, owning_window, extra_settings);
-       connect("response",
-               &SelectFileDialogLinuxGtk::OnSelectSingleFileDialogResponse);
-       break;
-@@ -412,10 +416,14 @@ void SelectFileDialogLinuxGtk::FileNotSelected(GtkWidget* dialog) {
- GtkWidget* SelectFileDialogLinuxGtk::CreateFileOpenHelper(
+@@ -407,9 +407,11 @@ GtkWidget* SelectFileDialogLinuxGtk::CreateFileOpenHelper(
      const std::string& title,
      const base::FilePath& default_path,
--    gfx::NativeWindow parent) {
-+    gfx::NativeWindow parent,
-+    const ExtraSettings& settings) {
-+  const char* button_label = settings.button_label.empty()
-+                                 ? GetOpenLabel()
-+                                 : settings.button_label.c_str();
+     gfx::NativeWindow parent) {
++  const char* accept_button_label =
++      button_label().empty() ? GetOpenLabel() : button_label().c_str();
    GtkWidget* dialog = GtkFileChooserDialogNew(
        title.c_str(), nullptr, GTK_FILE_CHOOSER_ACTION_OPEN, GetCancelLabel(),
 -      GTK_RESPONSE_CANCEL, GetOpenLabel(), GTK_RESPONSE_ACCEPT);
-+      GTK_RESPONSE_CANCEL, button_label, GTK_RESPONSE_ACCEPT);
++      GTK_RESPONSE_CANCEL, accept_button_label, GTK_RESPONSE_ACCEPT);
    SetGtkTransientForAura(dialog, parent);
    AddFilters(GTK_FILE_CHOOSER(dialog));
  
-@@ -431,6 +439,8 @@ GtkWidget* SelectFileDialogLinuxGtk::CreateFileOpenHelper(
+@@ -425,6 +427,7 @@ GtkWidget* SelectFileDialogLinuxGtk::CreateFileOpenHelper(
      GtkFileChooserSetCurrentFolder(GTK_FILE_CHOOSER(dialog),
                                     *last_opened_path());
    }
-+  gtk_file_chooser_set_show_hidden(GTK_FILE_CHOOSER(dialog),
-+                                   settings.show_hidden);
++  gtk_file_chooser_set_show_hidden(GTK_FILE_CHOOSER(dialog), show_hidden());
    return dialog;
  }
  
-@@ -438,7 +448,8 @@ GtkWidget* SelectFileDialogLinuxGtk::CreateSelectFolderDialog(
-     Type type,
-     const std::string& title,
-     const base::FilePath& default_path,
--    gfx::NativeWindow parent) {
-+    gfx::NativeWindow parent,
-+    const ExtraSettings& settings) {
-   std::string title_string = title;
-   if (title_string.empty()) {
-     title_string =
-@@ -446,11 +457,14 @@ GtkWidget* SelectFileDialogLinuxGtk::CreateSelectFolderDialog(
+@@ -440,11 +443,15 @@ GtkWidget* SelectFileDialogLinuxGtk::CreateSelectFolderDialog(
              ? l10n_util::GetStringUTF8(IDS_SELECT_UPLOAD_FOLDER_DIALOG_TITLE)
              : l10n_util::GetStringUTF8(IDS_SELECT_FOLDER_DIALOG_TITLE);
    }
@@ -99,304 +48,338 @@ index 129979e844581e68fdecde87bd52f3344f88022a..5e02a36e5e9eb4db84700dd9a0b8765d
 -                IDS_SELECT_UPLOAD_FOLDER_DIALOG_UPLOAD_BUTTON)
 -          : GetOpenLabel();
 +
-+  std::string accept_button_label = settings.button_label;
++  std::string accept_button_label = button_label();
 +  if (accept_button_label.empty()) {
-+    accept_button_label = (type == SELECT_UPLOAD_FOLDER)
-+        ? l10n_util::GetStringUTF8(
-+              IDS_SELECT_UPLOAD_FOLDER_DIALOG_UPLOAD_BUTTON)
-+        : GetOpenLabel();
++    accept_button_label =
++        (type == SELECT_UPLOAD_FOLDER)
++            ? l10n_util::GetStringUTF8(
++                  IDS_SELECT_UPLOAD_FOLDER_DIALOG_UPLOAD_BUTTON)
++            : GetOpenLabel();
 +  }
  
    GtkWidget* dialog = GtkFileChooserDialogNew(
        title_string.c_str(), nullptr, GTK_FILE_CHOOSER_ACTION_SELECT_FOLDER,
-@@ -472,19 +486,21 @@ GtkWidget* SelectFileDialogLinuxGtk::CreateSelectFolderDialog(
+@@ -466,7 +473,8 @@ GtkWidget* SelectFileDialogLinuxGtk::CreateSelectFolderDialog(
    gtk_file_filter_add_mime_type(only_folders, "inode/directory");
    gtk_file_filter_add_mime_type(only_folders, "text/directory");
    gtk_file_chooser_add_filter(chooser, only_folders);
 -  gtk_file_chooser_set_select_multiple(chooser, FALSE);
-+  gtk_file_chooser_set_select_multiple(chooser, settings.allow_multiple_selection);
-+  gtk_file_chooser_set_show_hidden(chooser, settings.show_hidden);
++  gtk_file_chooser_set_select_multiple(chooser, allow_multiple_selection());
++  gtk_file_chooser_set_show_hidden(chooser, show_hidden());
    return dialog;
  }
  
- GtkWidget* SelectFileDialogLinuxGtk::CreateFileOpenDialog(
-     const std::string& title,
-     const base::FilePath& default_path,
--    gfx::NativeWindow parent) {
-+    gfx::NativeWindow parent,
-+    const ExtraSettings& settings) {
-   std::string title_string =
-       !title.empty() ? title
-                      : l10n_util::GetStringUTF8(IDS_OPEN_FILE_DIALOG_TITLE);
- 
--  GtkWidget* dialog = CreateFileOpenHelper(title_string, default_path, parent);
-+  GtkWidget* dialog = CreateFileOpenHelper(title_string, default_path, parent, settings);
-   gtk_file_chooser_set_select_multiple(GTK_FILE_CHOOSER(dialog), FALSE);
-   return dialog;
- }
-@@ -492,12 +508,14 @@ GtkWidget* SelectFileDialogLinuxGtk::CreateFileOpenDialog(
- GtkWidget* SelectFileDialogLinuxGtk::CreateMultiFileOpenDialog(
-     const std::string& title,
-     const base::FilePath& default_path,
--    gfx::NativeWindow parent) {
-+    gfx::NativeWindow parent,
-+    const ExtraSettings& settings) {
-   std::string title_string =
-       !title.empty() ? title
-                      : l10n_util::GetStringUTF8(IDS_OPEN_FILES_DIALOG_TITLE);
- 
--  GtkWidget* dialog = CreateFileOpenHelper(title_string, default_path, parent);
-+  GtkWidget* dialog =
-+      CreateFileOpenHelper(title_string, default_path, parent, settings);
-   gtk_file_chooser_set_select_multiple(GTK_FILE_CHOOSER(dialog), TRUE);
-   return dialog;
- }
-@@ -505,14 +523,17 @@ GtkWidget* SelectFileDialogLinuxGtk::CreateMultiFileOpenDialog(
- GtkWidget* SelectFileDialogLinuxGtk::CreateSaveAsDialog(
-     const std::string& title,
-     const base::FilePath& default_path,
--    gfx::NativeWindow parent) {
-+    gfx::NativeWindow parent,
-+    const ExtraSettings& settings) {
+@@ -503,10 +511,11 @@ GtkWidget* SelectFileDialogLinuxGtk::CreateSaveAsDialog(
    std::string title_string =
        !title.empty() ? title
                       : l10n_util::GetStringUTF8(IDS_SAVE_AS_DIALOG_TITLE);
 -
-+  const char* button_label = settings.button_label.empty()
-+                                 ? GetSaveLabel()
-+                                 : settings.button_label.c_str();
++  const char* accept_button_label =
++      button_label().empty() ? GetSaveLabel() : button_label().c_str();
    GtkWidget* dialog = GtkFileChooserDialogNew(
        title_string.c_str(), nullptr, GTK_FILE_CHOOSER_ACTION_SAVE,
 -      GetCancelLabel(), GTK_RESPONSE_CANCEL, GetSaveLabel(),
-+      GetCancelLabel(), GTK_RESPONSE_CANCEL, button_label,
++      GetCancelLabel(), GTK_RESPONSE_CANCEL, accept_button_label,
        GTK_RESPONSE_ACCEPT);
    SetGtkTransientForAura(dialog, parent);
  
-@@ -538,9 +559,10 @@ GtkWidget* SelectFileDialogLinuxGtk::CreateSaveAsDialog(
+@@ -532,9 +541,10 @@ GtkWidget* SelectFileDialogLinuxGtk::CreateSaveAsDialog(
    gtk_file_chooser_set_select_multiple(GTK_FILE_CHOOSER(dialog), FALSE);
    // Overwrite confirmation is always enabled in GTK4.
    if (!GtkCheckVersion(4)) {
 -    gtk_file_chooser_set_do_overwrite_confirmation(GTK_FILE_CHOOSER(dialog),
 -                                                   TRUE);
 +    gtk_file_chooser_set_do_overwrite_confirmation(
-+        GTK_FILE_CHOOSER(dialog), settings.show_overwrite_confirmation);
++        GTK_FILE_CHOOSER(dialog), show_overwrite_confirmation());
    }
-+  gtk_file_chooser_set_show_hidden(GTK_FILE_CHOOSER(dialog), settings.show_hidden);
++  gtk_file_chooser_set_show_hidden(GTK_FILE_CHOOSER(dialog), show_hidden());
    return dialog;
  }
  
-diff --git a/ui/gtk/select_file_dialog_linux_gtk.h b/ui/gtk/select_file_dialog_linux_gtk.h
-index 53ae15f14c45ee72abdae172fc4555c9e4b3ff9a..ee19c3f399a1d060d5e9bd0dc5f1b3828381e8df 100644
---- a/ui/gtk/select_file_dialog_linux_gtk.h
-+++ b/ui/gtk/select_file_dialog_linux_gtk.h
-@@ -90,19 +90,23 @@ class SelectFileDialogLinuxGtk : public ui::SelectFileDialogLinux,
-   GtkWidget* CreateSelectFolderDialog(Type type,
-                                       const std::string& title,
-                                       const base::FilePath& default_path,
--                                      gfx::NativeWindow parent);
-+                                      gfx::NativeWindow parent,
-+                                      const ExtraSettings& settings);
+diff --git a/ui/shell_dialogs/select_file_dialog.h b/ui/shell_dialogs/select_file_dialog.h
+index eb3d997598631b220c3566748f23a5cdac3e4692..b4b2f7294ce6e9349a4a8a05f614e93359eca25a 100644
+--- a/ui/shell_dialogs/select_file_dialog.h
++++ b/ui/shell_dialogs/select_file_dialog.h
+@@ -224,6 +224,21 @@ class SHELL_DIALOGS_EXPORT SelectFileDialog
+                   const GURL* caller = nullptr);
+   bool HasMultipleFileTypeChoices();
  
-   GtkWidget* CreateFileOpenDialog(const std::string& title,
-                                   const base::FilePath& default_path,
--                                  gfx::NativeWindow parent);
-+                                  gfx::NativeWindow parent,
-+                                  const ExtraSettings& settings);
++#if BUILDFLAG(IS_LINUX)
++  // Set the label used for the file select button.
++  virtual void SetButtonLabel(const std::string& label) = 0;
++
++  // Set whether a confirmation should be shown when attempting to overwrite an
++  // existing file.
++  virtual void SetOverwriteConfirmationShown(bool is_shown) = 0;
++
++  // Set whether hidden files should be shown.
++  virtual void SetHiddenShown(bool is_shown) = 0;
++
++  // Set whether multiple file/directory selections are allowed
++  virtual void SetMultipleSelectionsAllowed(bool is_allowed) = 0;
++#endif
++
+  protected:
+   friend class base::RefCountedThreadSafe<SelectFileDialog>;
  
-   GtkWidget* CreateMultiFileOpenDialog(const std::string& title,
-                                        const base::FilePath& default_path,
--                                       gfx::NativeWindow parent);
-+                                       gfx::NativeWindow parent,
-+                                       const ExtraSettings& settings);
+diff --git a/ui/shell_dialogs/select_file_dialog_linux.cc b/ui/shell_dialogs/select_file_dialog_linux.cc
+index 4b540a7fcdf077640e6eab0249f23ccb35a0fcb1..1ca82e8c12d2c9af09ab5facdd9753e83fcc44e4 100644
+--- a/ui/shell_dialogs/select_file_dialog_linux.cc
++++ b/ui/shell_dialogs/select_file_dialog_linux.cc
+@@ -37,4 +37,17 @@ bool SelectFileDialogLinux::CallDirectoryExistsOnUIThread(
+   return base::DirectoryExists(path);
+ }
  
-   GtkWidget* CreateSaveAsDialog(const std::string& title,
-                                 const base::FilePath& default_path,
--                                gfx::NativeWindow parent);
-+                                gfx::NativeWindow parent,
-+                                const ExtraSettings& settings);
- 
-   // Removes and returns the |params| associated with |dialog| from
-   // |params_map_|.
-@@ -121,7 +125,8 @@ class SelectFileDialogLinuxGtk : public ui::SelectFileDialogLinux,
-   // Common function for CreateFileOpenDialog and CreateMultiFileOpenDialog.
-   GtkWidget* CreateFileOpenHelper(const std::string& title,
-                                   const base::FilePath& default_path,
--                                  gfx::NativeWindow parent);
-+                                  gfx::NativeWindow parent,
-+                                  const ExtraSettings& settings);
- 
-   // Callback for when the user responds to a Save As or Open File dialog.
-   void OnSelectSingleFileDialogResponse(GtkWidget* dialog, int response_id);
++void SelectFileDialogLinux::SetButtonLabel(const std::string& label) {
++  button_label_ = label;
++}
++void SelectFileDialogLinux::SetOverwriteConfirmationShown(bool is_shown) {
++  show_overwrite_confirmation_ = is_shown;
++}
++void SelectFileDialogLinux::SetHiddenShown(bool is_shown) {
++  show_hidden_ = is_shown;
++}
++void SelectFileDialogLinux::SetMultipleSelectionsAllowed(bool is_allowed) {
++  allow_multiple_selection_ = is_allowed;
++}
++
+ }  // namespace ui
 diff --git a/ui/shell_dialogs/select_file_dialog_linux.h b/ui/shell_dialogs/select_file_dialog_linux.h
-index 20ad001988831afca73315c577f90c824a36e282..57a8d35ace583eaafb526f70935d21c0f8fd1078 100644
+index 61683d0eddb04c494ca5e650e7d556b44968ec49..5492456a9138b250e97a5479838bb443cafff8bb 100644
 --- a/ui/shell_dialogs/select_file_dialog_linux.h
 +++ b/ui/shell_dialogs/select_file_dialog_linux.h
-@@ -26,6 +26,13 @@ class SHELL_DIALOGS_EXPORT SelectFileDialogLinux : public SelectFileDialog {
-   SelectFileDialogLinux(const SelectFileDialogLinux&) = delete;
-   SelectFileDialogLinux& operator=(const SelectFileDialogLinux&) = delete;
+@@ -33,6 +33,12 @@ class SHELL_DIALOGS_EXPORT SelectFileDialogLinux : public SelectFileDialog {
+   // BaseShellDialog implementation.
+   void ListenerDestroyed() override;
  
-+  struct ExtraSettings {
-+    std::string button_label;
-+    bool show_overwrite_confirmation = true;
-+    bool show_hidden = false;
-+    bool allow_multiple_selection = false;
-+  };
++  // SelectFileDialog:
++  void SetButtonLabel(const std::string& label) override;
++  void SetOverwriteConfirmationShown(bool is_shown) override;
++  void SetHiddenShown(bool is_shown) override;
++  void SetMultipleSelectionsAllowed(bool is_allowed) override;
 +
-   // Returns true if the SelectFileDialog class returned by
-   // NewSelectFileDialogImplKDE will actually work.
-   static bool CheckKDEDialogWorksOnUIThread(std::string& kdialog_version);
+  protected:
+   explicit SelectFileDialogLinux(Listener* listener,
+                                  std::unique_ptr<ui::SelectFilePolicy> policy);
+@@ -77,6 +83,11 @@ class SHELL_DIALOGS_EXPORT SelectFileDialogLinux : public SelectFileDialog {
+     *last_opened_path_ = last_opened_path;
+   }
+ 
++  const std::string& button_label() { return button_label_; }
++  bool show_overwrite_confirmation() { return show_overwrite_confirmation_; }
++  bool show_hidden() { return show_hidden_; }
++  bool allow_multiple_selection() { return allow_multiple_selection_; }
++
+  private:
+   // The file filters.
+   FileTypeInfo file_types_;
+@@ -92,6 +103,11 @@ class SHELL_DIALOGS_EXPORT SelectFileDialogLinux : public SelectFileDialog {
+   // file so that we can display future dialogs with the same starting path.
+   static base::FilePath* last_saved_path_;
+   static base::FilePath* last_opened_path_;
++
++  std::string button_label_;
++  bool show_overwrite_confirmation_ = true;
++  bool show_hidden_ = false;
++  bool allow_multiple_selection_ = false;
+ };
+ 
+ }  // namespace ui
 diff --git a/ui/shell_dialogs/select_file_dialog_linux_kde.cc b/ui/shell_dialogs/select_file_dialog_linux_kde.cc
-index c79fb47bfba9233da7d2c1438d1e26600684fc78..d7cc7cd70653aaa5b628ef456dcb48a2eef5ec5e 100644
+index 64a79ebe2e2d21d5a6b4a98042d1cdb7b6edad52..16f2ae01a8d33e6341ed52638e963c340455ebf8 100644
 --- a/ui/shell_dialogs/select_file_dialog_linux_kde.cc
 +++ b/ui/shell_dialogs/select_file_dialog_linux_kde.cc
-@@ -480,6 +480,9 @@ void SelectFileDialogLinuxKde::CreateSelectFolderDialog(
-   int title_message_id = (type == SELECT_UPLOAD_FOLDER)
-                              ? IDS_SELECT_UPLOAD_FOLDER_DIALOG_TITLE
-                              : IDS_SELECT_FOLDER_DIALOG_TITLE;
-+  ExtraSettings extra_settings;
-+  if (params)
-+    extra_settings = *(static_cast<ExtraSettings*>(params));
-   pipe_task_runner_->PostTaskAndReplyWithResult(
-       FROM_HERE,
-       base::BindOnce(
-@@ -487,7 +490,7 @@ void SelectFileDialogLinuxKde::CreateSelectFolderDialog(
+@@ -468,7 +468,7 @@ void SelectFileDialogLinuxKde::CreateSelectFolderDialog(
            KDialogParams(
                "--getexistingdirectory", GetTitle(title, title_message_id),
                default_path.empty() ? *last_opened_path() : default_path, parent,
 -              false, false)),
-+              false, extra_settings.allow_multiple_selection)),
++              false, allow_multiple_selection())),
        base::BindOnce(
            &SelectFileDialogLinuxKde::OnSelectSingleFolderDialogResponse, this,
-           parent, params));
+           parent));
 diff --git a/ui/shell_dialogs/select_file_dialog_linux_portal.cc b/ui/shell_dialogs/select_file_dialog_linux_portal.cc
-index 65727489ddecb755eeabbd194ce843ca9eaa59c9..b15bace56639d2f914f8f76edfa1b28e33165b48 100644
+index 9780c80ffff7bdb715a9adcb656e5d33be974db6..cf6edf5c68a8e2f8ffda119b58c6283bc43199c0 100644
 --- a/ui/shell_dialogs/select_file_dialog_linux_portal.cc
 +++ b/ui/shell_dialogs/select_file_dialog_linux_portal.cc
-@@ -219,6 +219,10 @@ void SelectFileDialogLinuxPortal::SelectFileImpl(
-   info_->main_task_runner = base::SequencedTaskRunner::GetCurrentDefault();
-   listener_params_ = params;
+@@ -11,6 +11,7 @@
  
-+  ExtraSettings extra_settings;
-+  if (params)
-+    extra_settings = *(static_cast<ExtraSettings*>(params));
+ #include <string_view>
+ 
++#include "base/command_line.h"
+ #include "base/functional/bind.h"
+ #include "base/logging.h"
+ #include "base/no_destructor.h"
+@@ -40,6 +41,8 @@ namespace {
+ constexpr char kXdgPortalService[] = "org.freedesktop.portal.Desktop";
+ constexpr char kXdgPortalObject[] = "/org/freedesktop/portal/desktop";
+ 
++// Version 4 includes support for current_folder option to the OpenFile method via
++// https://github.com/flatpak/xdg-desktop-portal/commit/71165a5.
+ constexpr int kXdgPortalRequiredVersion = 3;
+ 
+ constexpr char kXdgPortalRequestInterfaceName[] =
+@@ -66,6 +69,8 @@ constexpr int kFileChooserFilterKindGlob = 0;
+ 
+ constexpr char kFileUriPrefix[] = "file://";
+ 
++const char kXdgPortalRequiredVersionFlag[] = "xdg-portal-required-version";
 +
+ struct FileChooserProperties : dbus::PropertySet {
+   dbus::Property<uint32_t> version;
+ 
+@@ -171,10 +176,18 @@ void SelectFileDialogLinuxPortal::StartAvailabilityTestInBackground() {
+   if (GetAvailabilityTestCompletionFlag()->IsSet())
+     return;
+ 
++  auto* cmd = base::CommandLine::ForCurrentProcess();
++  unsigned int xdg_portal_required_version;
++  if (!base::StringToUint(cmd->GetSwitchValueASCII(kXdgPortalRequiredVersionFlag),
++                          &xdg_portal_required_version)) {
++    xdg_portal_required_version = kXdgPortalRequiredVersion;
++  }
++
+   dbus_thread_linux::GetTaskRunner()->PostTask(
+       FROM_HERE,
+       base::BindOnce(
+-          &SelectFileDialogLinuxPortal::CheckPortalAvailabilityOnBusThread));
++          &SelectFileDialogLinuxPortal::CheckPortalAvailabilityOnBusThread,
++          xdg_portal_required_version));
+ }
+ 
+ // static
+@@ -185,6 +198,11 @@ bool SelectFileDialogLinuxPortal::IsPortalAvailable() {
+   return is_portal_available_;
+ }
+ 
++// static
++int SelectFileDialogLinuxPortal::GetPortalVersion() {
++  return available_portal_version_;
++}
++
+ // static
+ void SelectFileDialogLinuxPortal::DestroyPortalConnection() {
+   dbus_thread_linux::GetTaskRunner()->PostTask(
+@@ -214,6 +232,8 @@ void SelectFileDialogLinuxPortal::SelectFileImpl(
+                      weak_factory_.GetWeakPtr()));
+   info_->type = type;
+   info_->main_task_runner = base::SequencedTaskRunner::GetCurrentDefault();
++  info_->button_label = button_label();
++  info_->allow_multiple_selection = allow_multiple_selection();
+ 
    if (owning_window) {
      if (auto* root = owning_window->GetRootWindow()) {
-       if (auto* host = root->GetNativeWindowProperty(
-@@ -246,7 +250,7 @@ void SelectFileDialogLinuxPortal::SelectFileImpl(
-             host_->GetAcceleratedWidget(),
-             base::BindOnce(
-                 &SelectFileDialogLinuxPortal::SelectFileImplWithParentHandle,
--                this, title, default_path, filter_set, default_extension))) {
-+                this, title, default_path, filter_set, default_extension, extra_settings))) {
-       // Return early to skip the fallback below.
-       return;
-     } else {
-@@ -256,7 +260,7 @@ void SelectFileDialogLinuxPortal::SelectFileImpl(
- 
-   // No parent, so just use a blank parent handle.
-   SelectFileImplWithParentHandle(title, default_path, filter_set,
--                                 default_extension, "");
-+                                 default_extension, extra_settings, "");
+@@ -260,7 +280,8 @@ bool SelectFileDialogLinuxPortal::HasMultipleFileTypeChoicesImpl() {
  }
  
- bool SelectFileDialogLinuxPortal::HasMultipleFileTypeChoicesImpl() {
-@@ -453,6 +457,7 @@ void SelectFileDialogLinuxPortal::SelectFileImplWithParentHandle(
-     base::FilePath default_path,
-     PortalFilterSet filter_set,
-     base::FilePath::StringType default_extension,
-+    const ExtraSettings& settings,
-     std::string parent_handle) {
-   bool default_path_exists = CallDirectoryExistsOnUIThread(default_path);
-   dbus_thread_linux::GetTaskRunner()->PostTask(
-@@ -461,7 +466,7 @@ void SelectFileDialogLinuxPortal::SelectFileImplWithParentHandle(
-           &SelectFileDialogLinuxPortal::DialogInfo::SelectFileImplOnBusThread,
-           info_, std::move(title), std::move(default_path), default_path_exists,
-           std::move(filter_set), std::move(default_extension),
--          std::move(parent_handle)));
-+          std::move(parent_handle), std::move(settings)));
- }
- 
- void SelectFileDialogLinuxPortal::DialogInfo::SelectFileImplOnBusThread(
-@@ -470,7 +475,8 @@ void SelectFileDialogLinuxPortal::DialogInfo::SelectFileImplOnBusThread(
-     const bool default_path_exists,
-     PortalFilterSet filter_set,
-     base::FilePath::StringType default_extension,
--    std::string parent_handle) {
-+    std::string parent_handle,
-+    const ExtraSettings& settings) {
+ // static
+-void SelectFileDialogLinuxPortal::CheckPortalAvailabilityOnBusThread() {
++void SelectFileDialogLinuxPortal::CheckPortalAvailabilityOnBusThread(
++    unsigned int xdg_portal_required_version) {
    DCHECK(dbus_thread_linux::GetTaskRunner()->RunsTasksInCurrentSequence());
-   dbus::Bus* bus = AcquireBusOnBusThread();
-   if (!bus->Connect())
-@@ -516,7 +522,7 @@ void SelectFileDialogLinuxPortal::DialogInfo::SelectFileImplOnBusThread(
-       base::StringPrintf("handle_%d", handle_token_counter_++);
+   base::AtomicFlag* availability_test_complete =
+       GetAvailabilityTestCompletionFlag();
+@@ -274,6 +295,7 @@ void SelectFileDialogLinuxPortal::CheckPortalAvailabilityOnBusThread() {
+       base::BindOnce(
+           [](scoped_refptr<dbus::Bus> bus,
+              base::AtomicFlag* availability_test_complete,
++             unsigned int xdg_portal_required_version,
+              std::optional<bool> name_has_owner) {
+             if (name_has_owner.value_or(false)) {
+               // The portal service has an owner, proceed to check the version.
+@@ -285,15 +307,22 @@ void SelectFileDialogLinuxPortal::CheckPortalAvailabilityOnBusThread() {
+               if (!properties.GetAndBlock(&properties.version)) {
+                 LOG(ERROR) << "Failed to read portal version property";
+               } else if (properties.version.value() >=
+-                         kXdgPortalRequiredVersion) {
++                         xdg_portal_required_version) {
+                 is_portal_available_ = true;
++                available_portal_version_ = properties.version.value();
++              } else {
++                VLOG(1) << "File chooser portal available version: "
++                        << properties.version.value();
++                available_portal_version_ = properties.version.value();
+               }
+             }
++            VLOG(1) << "File chooser portal expected version: "
++                    << xdg_portal_required_version;
+             VLOG(1) << "File chooser portal available: "
+                     << (is_portal_available_ ? "yes" : "no");
+             availability_test_complete->Set();
+           },
+-          bus, availability_test_complete));
++          bus, availability_test_complete, xdg_portal_required_version));
+ }
  
-   AppendOptions(&writer, response_handle_token, default_path,
--                default_path_exists, filter_set);
-+                default_path_exists, filter_set, settings);
- 
-   // The sender part of the handle object contains the D-Bus connection name
-   // without the prefix colon and with all dots replaced with underscores.
-@@ -546,7 +552,8 @@ void SelectFileDialogLinuxPortal::DialogInfo::AppendOptions(
-     const std::string& response_handle_token,
-     const base::FilePath& default_path,
-     const bool default_path_exists,
--    const SelectFileDialogLinuxPortal::PortalFilterSet& filter_set) {
-+    const SelectFileDialogLinuxPortal::PortalFilterSet& filter_set,
-+    const ExtraSettings& settings) {
-   dbus::MessageWriter options_writer(nullptr);
-   writer->OpenArray("{sv}", &options_writer);
- 
-@@ -554,8 +561,10 @@ void SelectFileDialogLinuxPortal::DialogInfo::AppendOptions(
+ // static
+@@ -471,7 +500,9 @@ void SelectFileDialogLinuxPortal::DialogInfo::AppendOptions(
                       response_handle_token);
  
    if (type == SelectFileDialog::Type::SELECT_UPLOAD_FOLDER) {
 -    AppendStringOption(&options_writer, kFileChooserOptionAcceptLabel,
--                       l10n_util::GetStringUTF8(
-+    const std::string accept_label = settings.button_label.empty()
-+                            ? kFileChooserOptionAcceptLabel
-+                            : settings.button_label;
-+    AppendStringOption(&options_writer, accept_label, l10n_util::GetStringUTF8(
++    const std::string accept_label =
++        button_label.empty() ? kFileChooserOptionAcceptLabel : button_label;
++    AppendStringOption(&options_writer, accept_label,
+                        l10n_util::GetStringUTF8(
                             IDS_SELECT_UPLOAD_FOLDER_DIALOG_UPLOAD_BUTTON));
    }
- 
-@@ -563,6 +572,7 @@ void SelectFileDialogLinuxPortal::DialogInfo::AppendOptions(
+@@ -480,6 +511,8 @@ void SelectFileDialogLinuxPortal::DialogInfo::AppendOptions(
        type == SelectFileDialog::Type::SELECT_UPLOAD_FOLDER ||
        type == SelectFileDialog::Type::SELECT_EXISTING_FOLDER) {
      AppendBoolOption(&options_writer, kFileChooserOptionDirectory, true);
-+    AppendBoolOption(&options_writer, kFileChooserOptionMultiple, settings.allow_multiple_selection);
++    AppendBoolOption(&options_writer, kFileChooserOptionMultiple,
++                     allow_multiple_selection);
    } else if (type == SelectFileDialog::Type::SELECT_OPEN_MULTI_FILE) {
      AppendBoolOption(&options_writer, kFileChooserOptionMultiple, true);
    }
+@@ -820,6 +853,7 @@ SelectFileDialogLinuxPortal::DialogInfo::DialogInfo(
+ SelectFileDialogLinuxPortal::DialogInfo::~DialogInfo() = default;
+ 
+ bool SelectFileDialogLinuxPortal::is_portal_available_ = false;
++unsigned int SelectFileDialogLinuxPortal::available_portal_version_ = 0;
+ int SelectFileDialogLinuxPortal::handle_token_counter_ = 0;
+ 
+ }  // namespace ui
 diff --git a/ui/shell_dialogs/select_file_dialog_linux_portal.h b/ui/shell_dialogs/select_file_dialog_linux_portal.h
-index c487f7da19e2d05696a8eb72f2fa3e12972149f3..02a40c571570974dcc61e1b1f7ed95fbfc2bedf2 100644
+index d57a52b3ccbd3bd6d390615351ea2ad1e475b157..6a2800add2428ffd91286748f886d6c42510ba31 100644
 --- a/ui/shell_dialogs/select_file_dialog_linux_portal.h
 +++ b/ui/shell_dialogs/select_file_dialog_linux_portal.h
-@@ -115,7 +115,8 @@ class SelectFileDialogLinuxPortal : public SelectFileDialogLinux {
-                                    const bool default_path_exists,
-                                    PortalFilterSet filter_set,
-                                    base::FilePath::StringType default_extension,
--                                   std::string parent_handle);
-+                                   std::string parent_handle,
-+                                   const ExtraSettings& settings);
+@@ -47,6 +47,9 @@ class SelectFileDialogLinuxPortal : public SelectFileDialogLinux {
+   // availability test has not yet completed.
+   static bool IsPortalAvailable();
+ 
++  // Get version of portal if available.
++  static int GetPortalVersion();
++
+   // Destroys the connection to the bus.
+   static void DestroyPortalConnection();
+ 
+@@ -120,6 +123,8 @@ class SelectFileDialogLinuxPortal : public SelectFileDialogLinux {
      Type type;
      // The task runner the SelectFileImpl method was called on.
      scoped_refptr<base::SequencedTaskRunner> main_task_runner;
-@@ -143,7 +144,8 @@ class SelectFileDialogLinuxPortal : public SelectFileDialogLinux {
-                        const std::string& response_handle_token,
-                        const base::FilePath& default_path,
-                        const bool derfault_path_exists,
--                       const PortalFilterSet& filter_set);
-+                       const PortalFilterSet& filter_set,
-+                       const ExtraSettings& settings);
-     void AppendFilterStruct(dbus::MessageWriter* writer,
-                             const PortalFilter& filter);
-     std::vector<base::FilePath> ConvertUrisToPaths(
-@@ -190,6 +192,7 @@ class SelectFileDialogLinuxPortal : public SelectFileDialogLinux {
-       base::FilePath default_path,
-       PortalFilterSet filter_set,
-       base::FilePath::StringType default_extension,
-+      const ExtraSettings& settings,
-       std::string parent_handle);
++    std::string button_label;
++    bool allow_multiple_selection = false;
  
-   void DialogCreatedOnMainThread();
+    private:
+     friend class base::RefCountedThreadSafe<DialogInfo>;
+@@ -176,7 +181,8 @@ class SelectFileDialogLinuxPortal : public SelectFileDialogLinux {
+   };
+ 
+   // D-Bus configuration and initialization.
+-  static void CheckPortalAvailabilityOnBusThread();
++  static void CheckPortalAvailabilityOnBusThread(
++      unsigned int xdg_portal_required_version);
+ 
+   // Returns a flag, written by the D-Bus thread and read by the UI thread,
+   // indicating whether or not the availability test has completed.
+@@ -208,6 +214,9 @@ class SelectFileDialogLinuxPortal : public SelectFileDialogLinux {
+   // Written by the D-Bus thread and read by the UI thread.
+   static bool is_portal_available_;
+ 
++  // Written by the D-Bus thread and read by the UI thread.
++  static unsigned int available_portal_version_;
++
+   // Used by the D-Bus thread to generate unique handle tokens.
+   static int handle_token_counter_;
+ 

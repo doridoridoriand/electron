@@ -10,7 +10,9 @@
 #include "base/functional/bind.h"
 #include "base/i18n/rtl.h"
 #include "cc/paint/skia_paint_canvas.h"
+#include "content/public/browser/render_frame_host.h"
 #include "content/public/browser/render_view_host.h"
+#include "shell/browser/ui/autofill_popup.h"
 #include "ui/accessibility/ax_enums.mojom.h"
 #include "ui/base/dragdrop/drag_drop_types.h"
 #include "ui/color/color_provider.h"
@@ -324,23 +326,23 @@ void AutofillPopupView::OnMouseReleased(const ui::MouseEvent& event) {
 
 void AutofillPopupView::OnGestureEvent(ui::GestureEvent* event) {
   switch (event->type()) {
-    case ui::ET_GESTURE_TAP_DOWN:
-    case ui::ET_GESTURE_SCROLL_BEGIN:
-    case ui::ET_GESTURE_SCROLL_UPDATE:
+    case ui::EventType::kGestureTapDown:
+    case ui::EventType::kGestureScrollBegin:
+    case ui::EventType::kGestureScrollUpdate:
       if (HitTestPoint(event->location()))
         SetSelection(event->location());
       else
         ClearSelection();
       break;
-    case ui::ET_GESTURE_TAP:
-    case ui::ET_GESTURE_SCROLL_END:
+    case ui::EventType::kGestureTap:
+    case ui::EventType::kGestureScrollEnd:
       if (HitTestPoint(event->location()))
         AcceptSelection(event->location());
       else
         ClearSelection();
       break;
-    case ui::ET_GESTURE_TAP_CANCEL:
-    case ui::ET_SCROLL_FLING_START:
+    case ui::EventType::kGestureTapCancel:
+    case ui::EventType::kScrollFlingStart:
       ClearSelection();
       break;
     default:

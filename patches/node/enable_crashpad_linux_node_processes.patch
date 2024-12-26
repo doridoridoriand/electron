@@ -8,7 +8,7 @@ to child processes spawned with `ELECTRON_RUN_AS_NODE` which is used
 by the crashpad client to connect with the handler process.
 
 diff --git a/lib/child_process.js b/lib/child_process.js
-index c09fca512584ce2c674ae1d05136ff4cd8ea8471..d4edaa71a7bf6660bad209fbfbc43014bb4bf741 100644
+index 580a441a803bdd0b57871c0cdd8af576f11609b1..755712d24219de7ffe491957d941df7c8cf7baad 100644
 --- a/lib/child_process.js
 +++ b/lib/child_process.js
 @@ -61,6 +61,7 @@ let debug = require('internal/util/debuglog').debuglog(
@@ -19,7 +19,7 @@ index c09fca512584ce2c674ae1d05136ff4cd8ea8471..d4edaa71a7bf6660bad209fbfbc43014
  
  const {
    AbortError,
-@@ -154,7 +155,6 @@ function fork(modulePath, args = [], options) {
+@@ -153,7 +154,6 @@ function fork(modulePath, args = [], options) {
        ArrayPrototypeSplice(execArgv, index - 1, 2);
      }
    }

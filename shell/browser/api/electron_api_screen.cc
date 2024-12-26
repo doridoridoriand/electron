@@ -8,13 +8,13 @@
 #include <string_view>
 
 #include "base/functional/bind.h"
-#include "gin/dictionary.h"
 #include "gin/handle.h"
 #include "shell/browser/browser.h"
 #include "shell/common/gin_converters/callback_converter.h"
 #include "shell/common/gin_converters/gfx_converter.h"
 #include "shell/common/gin_converters/native_window_converter.h"
 #include "shell/common/gin_helper/dictionary.h"
+#include "shell/common/gin_helper/error_thrower.h"
 #include "shell/common/gin_helper/object_template_builder.h"
 #include "shell/common/node_includes.h"
 #include "ui/display/display.h"
@@ -82,7 +82,7 @@ gfx::Point Screen::GetCursorScreenPoint(v8::Isolate* isolate) {
     thrower.ThrowError(
         "screen.getCursorScreenPoint() cannot be called before a window has "
         "been created.");
-    return gfx::Point();
+    return {};
   }
 #endif
   return screen_->GetCursorScreenPoint();

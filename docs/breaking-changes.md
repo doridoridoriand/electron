@@ -12,6 +12,113 @@ This document uses the following convention to categorize breaking changes:
 * **Deprecated:** An API was marked as deprecated. The API will continue to function, but will emit a deprecation warning, and will be removed in a future release.
 * **Removed:** An API or feature was removed, and is no longer supported by Electron.
 
+## Planned Breaking API Changes (34.0)
+
+### Deprecated: `level`, `message`, `line`, and `sourceId` arguments in `console-message` event on `WebContents`
+
+The `console-message` event on `WebContents` has been updated to provide details on the `Event`
+argument.
+
+```js
+// Deprecated
+webContents.on('console-message', (event, level, message, line, sourceId) => {})
+
+// Replace with:
+webContents.on('console-message', ({ level, message, lineNumber, sourceId, frame }) => {})
+```
+
+Additionally, `level` is now a string with possible values of `info`, `warning`, `error`, and `debug`.
+
+## Planned Breaking API Changes (33.0)
+
+### Behavior Changed: frame properties may retrieve detached WebFrameMain instances or none at all
+
+APIs which provide access to a `WebFrameMain` instance may return an instance
+with `frame.detached` set to `true`, or possibly return `null`.
+
+When a frame performs a cross-origin navigation, it enters into a detached state
+in which it's no longer attached to the page. In this state, it may be running
+[unload](https://developer.mozilla.org/en-US/docs/Web/API/Window/unload_event)
+handlers prior to being deleted. In the event of an IPC sent during this state,
+`frame.detached` will be set to `true` with the frame being destroyed shortly
+thereafter.
+
+When receiving an event, it's important to access WebFrameMain properties
+immediately upon being received. Otherwise, it's not guaranteed to point to the
+same webpage as when received. To avoid misaligned expectations, Electron will
+return `null` in the case of late access where the webpage has changed.
+
+```ts
+ipcMain.on('unload-event', (event) => {
+  event.senderFrame; // ✅ accessed immediately
+});
+
+ipcMain.on('unload-event', async (event) => {
+  await crossOriginNavigationPromise;
+  event.senderFrame; // ❌ returns `null` due to late access
+});
+```
+
+### Behavior Changed: custom protocol URL handling on Windows
+
+Due to changes made in Chromium to support [Non-Special Scheme URLs](http://bit.ly/url-non-special), custom protocol URLs that use Windows file paths will no longer work correctly with the deprecated `protocol.registerFileProtocol` and the `baseURLForDataURL` property on `BrowserWindow.loadURL`, `WebContents.loadURL`, and `<webview>.loadURL`.  `protocol.handle` will also not work with these types of URLs but this is not a change since it has always worked that way.
+
+```js
+// No longer works
+protocol.registerFileProtocol('other', () => {
+  callback({ filePath: '/path/to/my/file' })
+})
+
+const mainWindow = new BrowserWindow()
+mainWindow.loadURL('data:text/html,<script src="loaded-from-dataurl.js"></script>', { baseURLForDataURL: 'other://C:\\myapp' })
+mainWindow.loadURL('other://C:\\myapp\\index.html')
+
+// Replace with
+const path = require('node:path')
+const nodeUrl = require('node:url')
+protocol.handle(other, (req) => {
+  const srcPath = 'C:\\myapp\\'
+  const reqURL = new URL(req.url)
+  return net.fetch(nodeUrl.pathToFileURL(path.join(srcPath, reqURL.pathname)).toString())
+})
+
+mainWindow.loadURL('data:text/html,<script src="loaded-from-dataurl.js"></script>', { baseURLForDataURL: 'other://' })
+mainWindow.loadURL('other://index.html')
+```
+
+### Behavior Changed: menu bar will be hidden during fullscreen on Windows
+
+This brings the behavior to parity with Linux. Prior behavior: Menu bar is still visible during fullscreen on Windows. New behavior: Menu bar is hidden during fullscreen on Windows.
+
+### Behavior Changed: `webContents` property on `login` on `app`
+
+The `webContents` property in the `login` event from `app` will be `null`
+when the event is triggered for requests from the [utility process](api/utility-process.md)
+created with `respondToAuthRequestsFromMainProcess` option.
+
+### Deprecated: `textured` option in `BrowserWindowConstructorOption.type`
+
+The `textured` option of `type` in `BrowserWindowConstructorOptions` has been deprecated with no replacement. This option relied on the [`NSWindowStyleMaskTexturedBackground`](https://developer.apple.com/documentation/appkit/nswindowstylemask/nswindowstylemasktexturedbackground) style mask on macOS, which has been deprecated with no alternative.
+
+### Removed: macOS 10.15 support
+
+macOS 10.15 (Catalina) is no longer supported by [Chromium](https://chromium-review.googlesource.com/c/chromium/src/+/5734361).
+
+Older versions of Electron will continue to run on Catalina, but macOS 11 (Big Sur)
+or later will be required to run Electron v33.0.0 and higher.
+
+### Deprecated: `systemPreferences.accessibilityDisplayShouldReduceTransparency`
+
+The `systemPreferences.accessibilityDisplayShouldReduceTransparency` property is now deprecated in favor of the new `nativeTheme.prefersReducedTransparency`, which provides identical information and works cross-platform.
+
+```js
+// Deprecated
+const shouldReduceTransparency = systemPreferences.accessibilityDisplayShouldReduceTransparency
+
+// Replace with:
+const prefersReducedTransparency = nativeTheme.prefersReducedTransparency
+```
+
 ## Planned Breaking API Changes (32.0)
 
 ### Removed: `File.path`
@@ -21,14 +128,14 @@ The nonstandard `path` property of the Web `File` object was added in an early v
 ```js
 // Before (renderer)
 
-const file = document.querySelector('input[type=file]')
+const file = document.querySelector('input[type=file]').files[0]
 alert(`Uploaded file path was: ${file.path}`)
 ```
 
 ```js
 // After (renderer)
 
-const file = document.querySelector('input[type=file]')
+const file = document.querySelector('input[type=file]').files[0]
 electron.showFilePath(file)
 
 // (preload)
@@ -44,7 +151,7 @@ contextBridge.exposeInMainWorld('electron', {
 })
 ```
 
-### Deprecated: `clearHistory`, `canGoBack`, `goBack`, `canGoForward`, `goForward`, `canGoToOffset`, `goToOffset` on `WebContents`
+### Deprecated: `clearHistory`, `canGoBack`, `goBack`, `canGoForward`, `goForward`, `goToIndex`, `canGoToOffset`, `goToOffset` on `WebContents`
 
 The navigation-related APIs are now deprecated.
 
@@ -57,6 +164,7 @@ win.webContents.canGoBack()
 win.webContents.goBack()
 win.webContents.canGoForward()
 win.webContents.goForward()
+win.webContents.goToIndex(index)
 win.webContents.canGoToOffset()
 win.webContents.goToOffset(index)
 
@@ -114,6 +222,24 @@ The autoresizing behavior is now standardized across all platforms.
 
 If your app uses `BrowserView.setAutoResize` to do anything more complex than making a BrowserView fill the entire window, it's likely you already had custom logic in place to handle this difference in behavior on macOS.
 If so, that logic will no longer be needed in Electron 30 as autoresizing behavior is consistent.
+
+### Deprecated: `BrowserView`
+
+The [`BrowserView`](./api/browser-view.md) class has been deprecated and
+replaced by the new [`WebContentsView`](./api/web-contents-view.md) class.
+
+`BrowserView` related methods in [`BrowserWindow`](./api/browser-window.md) have
+also been deprecated:
+
+```js
+BrowserWindow.fromBrowserView(browserView)
+win.setBrowserView(browserView)
+win.getBrowserView()
+win.addBrowserView(browserView)
+win.removeBrowserView(browserView)
+win.setTopBrowserView(browserView)
+win.getBrowserViews()
+```
 
 ### Removed: `params.inputFormType` property on `context-menu` on `WebContents`
 
@@ -442,7 +568,7 @@ systemPreferences.getColor('selected-content-background')
 
 ## Planned Breaking API Changes (25.0)
 
-### Deprecated: `protocol.{register,intercept}{Buffer,String,Stream,File,Http}Protocol`
+### Deprecated: `protocol.{un,}{register,intercept}{Buffer,String,Stream,File,Http}Protocol` and `protocol.isProtocol{Registered,Intercepted}`
 
 The `protocol.register*Protocol` and `protocol.intercept*Protocol` methods have
 been replaced with [`protocol.handle`](api/protocol.md#protocolhandlescheme-handler).
@@ -1777,7 +1903,7 @@ In Electron 7, this now returns a `FileList` with a `File` object for:
 
 Note that `webkitdirectory` no longer exposes the path to the selected folder.
 If you require the path to the selected folder rather than the folder contents,
-see the `dialog.showOpenDialog` API ([link](api/dialog.md#dialogshowopendialogbrowserwindow-options)).
+see the `dialog.showOpenDialog` API ([link](api/dialog.md#dialogshowopendialogwindow-options)).
 
 ### API Changed: Callback-based versions of promisified APIs
 

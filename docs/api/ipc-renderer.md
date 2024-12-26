@@ -7,6 +7,15 @@ hide_title: false
 
 # ipcRenderer
 
+<!--
+```YAML history
+changes:
+  - pr-url: https://github.com/electron/electron/pull/40330
+    description: "`ipcRenderer` can no longer be sent over the `contextBridge`"
+    breaking-changes-header: behavior-changed-ipcrenderer-can-no-longer-be-sent-over-the-contextbridge
+```
+-->
+
 > Communicate asynchronously from a renderer process to the main process.
 
 Process: [Renderer](../glossary.md#renderer-process)
@@ -39,7 +48,8 @@ Listens to `channel`, when a new message arrives `listener` would be called with
   * `event` [IpcRendererEvent][ipc-renderer-event]
   * `...args` any[]
 
-Alias for [`ipcRenderer.removeListener`](#ipcrendererremovelistenerchannel-listener).
+Removes the specified `listener` from the listener array for the specified
+`channel`.
 
 ### `ipcRenderer.once(channel, listener)`
 
@@ -67,14 +77,13 @@ Alias for [`ipcRenderer.on`](#ipcrendereronchannel-listener).
   * `event` [IpcRendererEvent][ipc-renderer-event]
   * `...args` any[]
 
-Removes the specified `listener` from the listener array for the specified
-`channel`.
+Alias for [`ipcRenderer.off`](#ipcrendereroffchannel-listener).
 
-### `ipcRenderer.removeAllListeners(channel)`
+### `ipcRenderer.removeAllListeners([channel])`
 
-* `channel` string
+* `channel` string (optional)
 
-Removes all listeners, or those of the specified `channel`.
+Removes all listeners from the specified `channel`. Removes all listeners from all channels if no channel is specified.
 
 ### `ipcRenderer.send(channel, ...args)`
 
